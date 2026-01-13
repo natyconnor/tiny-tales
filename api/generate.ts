@@ -79,10 +79,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const model = genAI.getGenerativeModel({ model: modelName });
     log("Gemini client initialized");
 
-    // Create the prompt
-    const prompt = `Create a simple, fun children's story about "${topic}".
+    // Create the prompt - now requesting JSON with story + 4 image prompts
+    const prompt = `Create a simple, fun children's story about "${topic}" along with 4 illustration prompts.
 
-IMPORTANT RULES:
+STORY RULES:
 1. ALL words in the story MUST be ${maxLetters} letters or fewer. This is critical - no exceptions!
 2. Use simple, easy-to-read language appropriate for early readers (ages 4-7)
 3. The story should be exactly 5-8 sentences long. The sentences don't have to be complete sentences
@@ -96,18 +96,74 @@ Examples of ${maxLetters}-letter words or shorter: ${getExampleWords(
       maxLetters
     )}
 
-Write only the story text, nothing else. No titles, no explanations, just the story.`;
+IMAGE PROMPT RULES:
+1. Create exactly 4 image prompts for key moments in the story
+2. Each prompt MUST start with: "whimsical watercolor children's book illustration:"
+3. Keep the main character/subject consistent across all 4 prompts
+4. Make prompts descriptive but concise (under 100 characters after the prefix)
+5. Prompts should be child-friendly and match the story's tone
 
-    // Generate the story
+Respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
+{
+  "story": "The story text here...",
+  "imagePrompts": [
+    "whimsical watercolor children's book illustration: first scene description",
+    "whimsical watercolor children's book illustration: second scene description",
+    "whimsical watercolor children's book illustration: third scene description",
+    "whimsical watercolor children's book illustration: fourth scene description"
+  ]
+}`;
+
+    // Generate the story and image prompts
     log("Calling Gemini API...");
     const result = await model.generateContent(prompt);
     log("Gemini API responded");
 
-    const story = result.response.text().trim();
-    log(`Story generated: ${story.length} chars`);
+    const responseText = result.response.text().trim();
+    log(`Response received: ${responseText.length} chars`);
+
+    // Parse the JSON response
+    let parsed: { story: string; imagePrompts: string[] };
+    try {
+      // Remove any markdown code block markers if present
+      const cleanJson = responseText
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      parsed = JSON.parse(cleanJson);
+    } catch {
+      log("Failed to parse JSON, attempting to extract story");
+      // Fallback: if JSON parsing fails, use the response as story text
+      parsed = {
+        story: responseText,
+        imagePrompts: [],
+      };
+    }
+
+    // Validate the parsed response
+    if (!parsed.story || typeof parsed.story !== "string") {
+      throw new Error("Invalid response: missing story text");
+    }
+
+    // Ensure we have exactly 4 image prompts (or empty array as fallback)
+    const imagePrompts = Array.isArray(parsed.imagePrompts)
+      ? parsed.imagePrompts.slice(0, 4)
+      : [];
+
+    log(
+      `Story generated: ${parsed.story.length} chars, ${imagePrompts.length} image prompts`
+    );
+
+    // Build Pollinations URLs for each image prompt
+    const imageUrls = imagePrompts.map((prompt) =>
+      buildPollinationsUrl(prompt)
+    );
 
     return res.status(200).json({
-      story,
+      story: parsed.story,
+      imagePrompts,
+      imageUrls,
       debug: { time: Date.now() - startTime, model: modelName },
     });
   } catch (error) {
@@ -196,6 +252,29 @@ function getExampleWords(maxLetters: number): string {
   };
 
   return (examples[maxLetters] || examples[5]).join(", ");
+}
+
+/**
+ * Builds a Pollinations.ai image URL from a prompt
+ * Supports optional API key for higher rate limits and no watermark
+ */
+function buildPollinationsUrl(prompt: string): string {
+  const params = new URLSearchParams({
+    width: "512",
+    height: "512",
+    model: "flux",
+    safe: "true",
+  });
+
+  // If API key is configured, enable nologo and add token
+  if (process.env.POLLINATIONS_API_KEY) {
+    params.set("nologo", "true");
+    params.set("token", process.env.POLLINATIONS_API_KEY);
+  }
+
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+    prompt
+  )}?${params.toString()}`;
 }
 
 // Node.js serverless config

@@ -16,6 +16,7 @@ interface Story {
   topic: string;
   maxLetters: number;
   content: string;
+  imageUrls: string[];
   createdAt: number;
 }
 
@@ -44,6 +45,8 @@ function App() {
   const [maxLetters, setMaxLetters] = useState(5);
   const [model, setModel] = useState("gemini-2.5-flash-lite");
   const [story, setStory] = useState("");
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [loadedImages, setLoadedImages] = useState<boolean[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [savedStories, setSavedStories] = useState<Story[]>([]);
@@ -82,6 +85,8 @@ function App() {
     setIsLoading(true);
     setError("");
     setStory("");
+    setImageUrls([]);
+    setLoadedImages([]);
 
     try {
       const response = await fetch("/api/generate", {
@@ -104,12 +109,18 @@ function App() {
       const data = await response.json();
       setStory(data.story);
 
+      // Set image URLs and initialize loading state
+      const urls = data.imageUrls || [];
+      setImageUrls(urls);
+      setLoadedImages(new Array(urls.length).fill(false));
+
       // Save to history
       saveStory({
         id: Date.now().toString(),
         topic: topic.trim(),
         maxLetters,
         content: data.story,
+        imageUrls: urls,
         createdAt: Date.now(),
       });
     } catch (err) {
@@ -123,6 +134,15 @@ function App() {
     }
   };
 
+  // Handle image load completion
+  const handleImageLoad = (index: number) => {
+    setLoadedImages((prev) => {
+      const updated = [...prev];
+      updated[index] = true;
+      return updated;
+    });
+  };
+
   const clearHistory = () => {
     setSavedStories([]);
     localStorage.removeItem(STORAGE_KEY);
@@ -132,6 +152,8 @@ function App() {
     setTopic(savedStory.topic);
     setMaxLetters(savedStory.maxLetters);
     setStory(savedStory.content);
+    setImageUrls(savedStory.imageUrls || []);
+    setLoadedImages(new Array(savedStory.imageUrls?.length || 0).fill(false));
     setShowHistory(false);
   };
 
@@ -357,7 +379,7 @@ function App() {
           {story && !isLoading && (
             <div className="mt-8 story-container bg-white rounded-3xl shadow-2xl p-6 md:p-8 border-4 border-yellow-300">
               {/* Story Header */}
-              <div className="flex items-center justify-between mb-4 no-print">
+              <div className="flex items-center justify-between mb-6 no-print">
                 <h2 className="text-2xl font-bold text-gray-700 font-comic flex items-center gap-2">
                   <span>📖</span> Your Story
                 </h2>
@@ -379,9 +401,76 @@ function App() {
                 </div>
               </div>
 
-              {/* Story Content */}
-              <div className="text-xl md:text-2xl leading-relaxed text-gray-800 font-lexend font-medium">
-                {renderStory(story)}
+              {/* Storybook Layout with Images */}
+              <div className="storybook-content">
+                {/* First two images side by side */}
+                {imageUrls.length >= 2 && (
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    {imageUrls.slice(0, 2).map((url, index) => (
+                      <div
+                        key={index}
+                        className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-pink-100 to-purple-100"
+                      >
+                        {!loadedImages[index] && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="w-10 h-10 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin mx-auto mb-2" />
+                              <p className="text-sm text-gray-500 font-lexend">
+                                Creating art...
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <img
+                          src={url}
+                          alt={`Story illustration ${index + 1}`}
+                          className={`w-full h-full object-cover transition-opacity duration-500 ${
+                            loadedImages[index] ? "opacity-100" : "opacity-0"
+                          }`}
+                          onLoad={() => handleImageLoad(index)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Story Text */}
+                <div className="text-xl md:text-2xl leading-relaxed text-gray-800 font-lexend font-medium mb-6 story-text">
+                  {renderStory(story)}
+                </div>
+
+                {/* Last two images side by side */}
+                {imageUrls.length >= 4 && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {imageUrls.slice(2, 4).map((url, index) => (
+                      <div
+                        key={index + 2}
+                        className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-cyan-100 to-green-100"
+                      >
+                        {!loadedImages[index + 2] && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="w-10 h-10 border-4 border-cyan-200 border-t-cyan-500 rounded-full animate-spin mx-auto mb-2" />
+                              <p className="text-sm text-gray-500 font-lexend">
+                                Creating art...
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <img
+                          src={url}
+                          alt={`Story illustration ${index + 3}`}
+                          className={`w-full h-full object-cover transition-opacity duration-500 ${
+                            loadedImages[index + 2]
+                              ? "opacity-100"
+                              : "opacity-0"
+                          }`}
+                          onLoad={() => handleImageLoad(index + 2)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Generate Another Button */}

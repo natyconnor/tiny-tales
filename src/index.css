@@ -109,16 +109,87 @@ body {
 
 /* Print styles */
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   body {
     background: white !important;
+    margin: 0;
+    padding: 0;
   }
 
   .no-print {
     display: none !important;
   }
 
+  .floating-shape {
+    display: none !important;
+  }
+
   .story-container {
     box-shadow: none !important;
-    border: 2px solid #333 !important;
+    border: 3px solid #FFD700 !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  .storybook-content {
+    page-break-inside: avoid;
+  }
+
+  /* Image grid for print */
+  .storybook-content .grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .storybook-content .grid > div {
+    aspect-ratio: 1 / 1;
+    border-radius: 12px !important;
+    overflow: hidden;
+    border: 2px solid #E5E7EB;
+  }
+
+  .storybook-content .grid img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    opacity: 1 !important;
+  }
+
+  /* Story text for print */
+  .story-text {
+    font-size: 18pt !important;
+    line-height: 1.6 !important;
+    color: #1F2937 !important;
+    margin: 20px 0 !important;
+  }
+
+  .story-word {
+    background: none !important;
+    transform: none !important;
+  }
+
+  .story-word:hover {
+    background: none !important;
+    transform: none !important;
+  }
+
+  /* Hide loading spinners in print */
+  .storybook-content .animate-spin {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: letter;
+    margin: 0.5in;
   }
 }
