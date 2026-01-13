@@ -155,16 +155,32 @@ Respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
       `Story generated: ${parsed.story.length} chars, ${imagePrompts.length} image prompts`
     );
 
-    // Build Pollinations URLs for each image prompt
-    const imageUrls = imagePrompts.map((prompt) =>
-      buildPollinationsUrl(prompt)
+    // Log each image prompt
+    imagePrompts.forEach((prompt, i) => {
+      log(
+        `Image prompt ${i + 1}: ${prompt.slice(0, 100)}${
+          prompt.length > 100 ? "..." : ""
+        }`
+      );
+    });
+
+    // Build Pollinations URLs for each image prompt (only log once to avoid spam)
+    const imageUrls = imagePrompts.map((prompt, i) =>
+      buildPollinationsUrl(prompt, i === 0 ? log : undefined)
     );
+
+    // Log summary of URLs
+    log(`Generated ${imageUrls.length} Pollinations URLs`);
 
     return res.status(200).json({
       story: parsed.story,
       imagePrompts,
       imageUrls,
-      debug: { time: Date.now() - startTime, model: modelName },
+      debug: {
+        time: Date.now() - startTime,
+        model: modelName,
+        pollinationsKeyConfigured: !!process.env.POLLINATIONS_API_KEY,
+      },
     });
   } catch (error) {
     const elapsed = Date.now() - startTime;
@@ -257,8 +273,15 @@ function getExampleWords(maxLetters: number): string {
 /**
  * Builds a Pollinations.ai image URL from a prompt
  * Supports optional API key for higher rate limits and no watermark
+ *
+ * Per https://pollinations.ai/docs - use "key" parameter for API key
  */
-function buildPollinationsUrl(prompt: string): string {
+function buildPollinationsUrl(
+  prompt: string,
+  log?: (msg: string) => void
+): string {
+  const pollinationsKey = process.env.POLLINATIONS_API_KEY;
+
   const params = new URLSearchParams({
     width: "512",
     height: "512",
@@ -266,15 +289,48 @@ function buildPollinationsUrl(prompt: string): string {
     safe: "true",
   });
 
-  // If API key is configured, enable nologo and add token
-  if (process.env.POLLINATIONS_API_KEY) {
-    params.set("nologo", "true");
-    params.set("token", process.env.POLLINATIONS_API_KEY);
+  // Log environment variable status
+  if (log) {
+    log(
+      `POLLINATIONS_API_KEY: ${
+        pollinationsKey
+          ? `"${pollinationsKey.slice(0, 8)}..." (${
+              pollinationsKey.length
+            } chars)`
+          : "NOT SET"
+      }`
+    );
   }
 
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+  // If API key is configured, add it to bypass rate limits
+  // Per pollinations.ai/docs, the parameter is "key"
+  if (pollinationsKey) {
+    params.set("nologo", "true");
+    params.set("key", pollinationsKey);
+    if (log) {
+      log(`Added key param to URL`);
+    }
+  } else {
+    if (log) {
+      log(
+        `WARNING: No POLLINATIONS_API_KEY configured - using anonymous tier with rate limits`
+      );
+    }
+  }
+
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
     prompt
   )}?${params.toString()}`;
+
+  if (log) {
+    // Log URL but redact the key for security
+    const safeUrl = pollinationsKey
+      ? url.replace(pollinationsKey, "[REDACTED]")
+      : url;
+    log(`Generated Pollinations URL: ${safeUrl}`);
+  }
+
+  return url;
 }
 
 // Node.js serverless config

@@ -106,6 +106,19 @@ function App() {
       }
 
       const data = await response.json();
+
+      // Debug logging
+      console.log("=== Story Generation Debug ===");
+      console.log("Story length:", data.story?.length, "chars");
+      console.log("Image prompts:", data.imagePrompts);
+      console.log("Image URLs:", data.imageUrls);
+      console.log("Debug info:", data.debug);
+      console.log(
+        "POLLINATIONS_API_KEY configured:",
+        data.debug?.pollinationsKeyConfigured ? "YES" : "NO"
+      );
+      console.log("==============================");
+
       setStory(data.story);
 
       // Set image URLs and initialize loading state
@@ -135,11 +148,21 @@ function App() {
 
   // Handle image load completion
   const handleImageLoad = (index: number) => {
+    console.log(`Image ${index + 1} loaded successfully`);
     setLoadedImages((prev) => {
       const updated = [...prev];
       updated[index] = true;
       return updated;
     });
+  };
+
+  // Handle image load error
+  const handleImageError = (index: number, url: string) => {
+    console.error(`Image ${index + 1} failed to load`);
+    console.error(`URL: ${url}`);
+    console.error(
+      "This may be due to Pollinations rate limiting. Check if referrer is configured."
+    );
   };
 
   const clearHistory = () => {
@@ -462,6 +485,7 @@ function App() {
                             loadedImages[index] ? "opacity-100" : "opacity-0"
                           }`}
                           onLoad={() => handleImageLoad(index)}
+                          onError={() => handleImageError(index, url)}
                         />
                       </div>
 
