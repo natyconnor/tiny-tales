@@ -9,8 +9,7 @@ interface RequestBody {
 // Allowed models (to prevent arbitrary model injection)
 const ALLOWED_MODELS = [
   "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
+  "gemini-2.5-flash-lite",
   "gemini-3-flash-preview",
 ];
 
@@ -63,11 +62,11 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    // Use requested model if valid, otherwise default
+    // Use requested model if valid, otherwise default to fastest model
     const modelName =
       requestedModel && ALLOWED_MODELS.includes(requestedModel)
         ? requestedModel
-        : "gemini-2.5-flash";
+        : "gemini-2.5-flash-lite";
 
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(apiKey);

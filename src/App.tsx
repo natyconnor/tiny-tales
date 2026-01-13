@@ -23,14 +23,14 @@ const STORAGE_KEY = "tiny-tales-stories";
 
 const AVAILABLE_MODELS = [
   {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    description: "Recommended",
-  },
-  {
     id: "gemini-2.5-flash-lite",
     name: "Gemini 2.5 Flash Lite",
-    description: "Fastest",
+    description: "Fastest ⚡ (recommended)",
+  },
+  {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    description: "More capable, slower",
   },
   {
     id: "gemini-3-flash-preview",
@@ -42,7 +42,7 @@ const AVAILABLE_MODELS = [
 function App() {
   const [topic, setTopic] = useState("");
   const [maxLetters, setMaxLetters] = useState(5);
-  const [model, setModel] = useState("gemini-2.5-flash");
+  const [model, setModel] = useState("gemini-2.5-flash-lite");
   const [story, setStory] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
