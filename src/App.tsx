@@ -650,18 +650,18 @@ function App() {
           className="absolute -left-[9999px] top-0"
           style={{ display: "none" }}
         >
-          <div className="w-[800px] bg-gradient-to-br from-amber-50 via-white to-pink-50 font-lexend p-8">
+          <div className="w-[600px] bg-gradient-to-b from-amber-50 to-pink-50 font-lexend p-6">
             {/* Decorative top border */}
-            <div className="h-2 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 rounded-full mb-6" />
+            <div className="h-1.5 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 rounded-full mb-4" />
 
             {/* Header */}
-            <div className="text-center mb-6">
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <span className="text-3xl">📖</span>
-                <h1 className="text-4xl font-bold font-comic rainbow-text">
+            <div className="text-center mb-4">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <span className="text-2xl">📖</span>
+                <h1 className="text-3xl font-bold font-comic text-purple-600">
                   Tiny Tales
                 </h1>
-                <span className="text-3xl">✨</span>
+                <span className="text-2xl">✨</span>
               </div>
               <p className="text-gray-500 text-sm">
                 A story about:{" "}
@@ -672,11 +672,9 @@ function App() {
             {/* Images Grid - uses preloaded data URLs for CORS compatibility */}
             {preloadedImages.filter(Boolean).length > 0 && (
               <div
-                className={`grid gap-3 mb-6 ${
+                className={`grid gap-2 mb-4 ${
                   preloadedImages.filter(Boolean).length === 1
                     ? "grid-cols-1"
-                    : preloadedImages.filter(Boolean).length === 3
-                    ? "grid-cols-3"
                     : "grid-cols-2"
                 }`}
               >
@@ -685,16 +683,12 @@ function App() {
                     dataUrl && (
                       <div
                         key={index}
-                        className="rounded-xl overflow-hidden border-3 border-yellow-300 shadow-lg bg-white"
+                        className="rounded-xl overflow-hidden border-2 border-yellow-300 shadow-md bg-white"
                       >
                         <img
                           src={dataUrl}
                           alt={`Story illustration ${index + 1}`}
-                          className={`w-full object-cover block ${
-                            preloadedImages.filter(Boolean).length === 1
-                              ? "h-72"
-                              : "h-44"
-                          }`}
+                          className="w-full h-36 object-cover block"
                         />
                       </div>
                     )
@@ -703,19 +697,15 @@ function App() {
             )}
 
             {/* Story Text Card */}
-            <div className="bg-white/80 backdrop-blur rounded-2xl p-6 border-3 border-yellow-300 shadow-lg">
-              <p className="text-xl leading-relaxed text-gray-800 font-lexend font-medium">
+            <div className="bg-white rounded-xl p-4 border-2 border-yellow-300 shadow-md">
+              <p className="text-lg leading-relaxed text-gray-800 font-lexend font-medium">
                 {story}
               </p>
             </div>
 
             {/* Footer */}
-            <div className="text-center mt-5 flex items-center justify-center gap-2">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
-              <p className="text-xs text-gray-400 px-3">
-                Made with Tiny Tales ✨
-              </p>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+            <div className="text-center mt-4">
+              <p className="text-xs text-gray-400">Made with Tiny Tales ✨</p>
             </div>
           </div>
         </div>
