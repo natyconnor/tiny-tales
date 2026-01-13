@@ -85,11 +85,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 IMPORTANT RULES:
 1. ALL words in the story MUST be ${maxLetters} letters or fewer. This is critical - no exceptions!
 2. Use simple, easy-to-read language appropriate for early readers (ages 4-7)
-3. The story should be exactly 5-8 sentences long
+3. The story should be exactly 5-8 sentences long. The sentences don't have to be complete sentences
 4. Make it engaging, fun, and age-appropriate
 5. Use short, simple sentences
 6. Include descriptive words that help paint a picture
 7. End with a positive or happy conclusion
+8. The longer the words, the more complex the story can be
 
 Examples of ${maxLetters}-letter words or shorter: ${getExampleWords(
       maxLetters
