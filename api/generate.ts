@@ -272,9 +272,11 @@ function getExampleWords(maxLetters: number): string {
 
 /**
  * Builds a Pollinations.ai image URL from a prompt
- * Supports optional API key for higher rate limits and no watermark
+ * Supports optional API key for higher rate limits
  *
- * Per https://pollinations.ai/docs - use "key" parameter for API key
+ * Per https://enter.pollinations.ai/api/docs#tag/genpollinationsai/GET/image/%7Bprompt%7D
+ * - API key can be passed as query param: ?key=YOUR_API_KEY
+ * - Or via Authorization header (not used here since we're building URLs)
  */
 function buildPollinationsUrl(
   prompt: string,
@@ -282,11 +284,14 @@ function buildPollinationsUrl(
 ): string {
   const pollinationsKey = process.env.POLLINATIONS_API_KEY;
 
+  // Per docs: default model is "zimage", default dimensions are 1024x1024
+  // Using 512x512 for faster loading in children's book context
   const params = new URLSearchParams({
     width: "512",
     height: "512",
-    model: "flux",
-    safe: "true",
+    model: "flux", // flux is still supported and good for illustrations
+    safe: "true", // Enable safety content filter for children's content
+    seed: "-1", // Random seed for variety
   });
 
   // Log environment variable status
@@ -303,9 +308,7 @@ function buildPollinationsUrl(
   }
 
   // If API key is configured, add it to bypass rate limits
-  // Per pollinations.ai/docs, the parameter is "key"
   if (pollinationsKey) {
-    params.set("nologo", "true");
     params.set("key", pollinationsKey);
     if (log) {
       log(`Added key param to URL`);
@@ -318,7 +321,7 @@ function buildPollinationsUrl(
     }
   }
 
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+  const url = `https://gen.pollinations.ai/image/${encodeURIComponent(
     prompt
   )}?${params.toString()}`;
 
