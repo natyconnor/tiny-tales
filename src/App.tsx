@@ -52,8 +52,40 @@ function App() {
   const [savedStories, setSavedStories] = useState<Story[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [preloadedImages, setPreloadedImages] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
+
+  // Preload images as data URLs when imageUrls change
+  useEffect(() => {
+    if (imageUrls.length === 0) {
+      setPreloadedImages([]);
+      return;
+    }
+
+    const loadImages = async () => {
+      const dataUrls = await Promise.all(
+        imageUrls.map(async (url) => {
+          try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            return new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = () => resolve(""); // Return empty on error
+              reader.readAsDataURL(blob);
+            });
+          } catch {
+            console.warn("Failed to preload image:", url);
+            return "";
+          }
+        })
+      );
+      setPreloadedImages(dataUrls);
+    };
+
+    loadImages();
+  }, [imageUrls]);
 
   // Focus input on page load
   useEffect(() => {
@@ -183,29 +215,32 @@ function App() {
   };
 
   const downloadAsImage = async () => {
-    if (!printContainerRef.current) return;
+    if (!printContainerRef.current) {
+      console.error("Print container ref not found");
+      return;
+    }
 
     setIsGeneratingImage(true);
+    const container = printContainerRef.current;
 
     try {
-      // Make the print container visible for rendering
-      printContainerRef.current.style.display = "block";
+      // Position the container on-screen for html2canvas (it needs to be visible)
+      container.style.display = "block";
+      container.style.position = "fixed";
+      container.style.left = "0";
+      container.style.top = "0";
+      container.style.zIndex = "9999";
 
-      // Wait a bit for images to be ready
+      // Wait for layout to settle
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const canvas = await html2canvas(printContainerRef.current, {
-        backgroundColor: "#ffffff",
-        scale: 2, // Higher quality
-        useCORS: true,
-        allowTaint: true,
+      const canvas = await html2canvas(container, {
+        backgroundColor: "#fffbeb",
+        scale: 2,
         logging: false,
       });
 
-      // Hide the print container again
-      printContainerRef.current.style.display = "none";
-
-      // Create download link
+      // Create and trigger download
       const link = document.createElement("a");
       link.download = `tiny-tale-${topic
         .replace(/[^a-z0-9]/gi, "-")
@@ -214,11 +249,14 @@ function App() {
       link.click();
     } catch (error) {
       console.error("Failed to generate image:", error);
+      alert("Sorry, couldn't generate the image. Please try again!");
     } finally {
+      // Reset container to hidden
+      container.style.display = "none";
+      container.style.position = "absolute";
+      container.style.left = "-9999px";
+      container.style.zIndex = "auto";
       setIsGeneratingImage(false);
-      if (printContainerRef.current) {
-        printContainerRef.current.style.display = "none";
-      }
     }
   };
 
@@ -608,6 +646,7 @@ function App() {
         {/* Hidden Print Container for Image Export */}
         <div
           ref={printContainerRef}
+          data-print-container
           className="absolute -left-[9999px] top-0"
           style={{ display: "none" }}
         >
@@ -630,32 +669,36 @@ function App() {
               </p>
             </div>
 
-            {/* Images Grid */}
-            {imageUrls.length > 0 && (
+            {/* Images Grid - uses preloaded data URLs for CORS compatibility */}
+            {preloadedImages.filter(Boolean).length > 0 && (
               <div
                 className={`grid gap-3 mb-6 ${
-                  imageUrls.length === 1
+                  preloadedImages.filter(Boolean).length === 1
                     ? "grid-cols-1"
-                    : imageUrls.length === 3
+                    : preloadedImages.filter(Boolean).length === 3
                     ? "grid-cols-3"
                     : "grid-cols-2"
                 }`}
               >
-                {imageUrls.map((url, index) => (
-                  <div
-                    key={index}
-                    className="rounded-xl overflow-hidden border-3 border-yellow-300 shadow-lg bg-white"
-                  >
-                    <img
-                      src={url}
-                      alt={`Story illustration ${index + 1}`}
-                      className={`w-full object-cover block ${
-                        imageUrls.length === 1 ? "h-72" : "h-44"
-                      }`}
-                      crossOrigin="anonymous"
-                    />
-                  </div>
-                ))}
+                {preloadedImages.map(
+                  (dataUrl, index) =>
+                    dataUrl && (
+                      <div
+                        key={index}
+                        className="rounded-xl overflow-hidden border-3 border-yellow-300 shadow-lg bg-white"
+                      >
+                        <img
+                          src={dataUrl}
+                          alt={`Story illustration ${index + 1}`}
+                          className={`w-full object-cover block ${
+                            preloadedImages.filter(Boolean).length === 1
+                              ? "h-72"
+                              : "h-44"
+                          }`}
+                        />
+                      </div>
+                    )
+                )}
               </div>
             )}
 
