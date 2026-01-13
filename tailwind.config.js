@@ -10,6 +10,9 @@ export default {
         'comic': ['"Comic Neue"', 'cursive'],
         'lexend': ['"Lexend"', 'sans-serif'],
       },
+      borderWidth: {
+        '3': '3px',
+      },
       animation: {
         'bounce-slow': 'bounce 2s infinite',
         'wiggle': 'wiggle 1s ease-in-out infinite',

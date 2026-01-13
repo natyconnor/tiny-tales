@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import html2canvas from "html2canvas";
 import {
   Sparkles,
   BookOpen,
   Wand2,
   RotateCcw,
-  Printer,
+  Download,
   Trash2,
   History,
   X,
@@ -50,7 +51,9 @@ function App() {
   const [error, setError] = useState("");
   const [savedStories, setSavedStories] = useState<Story[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const printContainerRef = useRef<HTMLDivElement>(null);
 
   // Focus input on page load
   useEffect(() => {
@@ -179,8 +182,44 @@ function App() {
     setShowHistory(false);
   };
 
-  const printStory = () => {
-    window.print();
+  const downloadAsImage = async () => {
+    if (!printContainerRef.current) return;
+
+    setIsGeneratingImage(true);
+
+    try {
+      // Make the print container visible for rendering
+      printContainerRef.current.style.display = "block";
+
+      // Wait a bit for images to be ready
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const canvas = await html2canvas(printContainerRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2, // Higher quality
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      });
+
+      // Hide the print container again
+      printContainerRef.current.style.display = "none";
+
+      // Create download link
+      const link = document.createElement("a");
+      link.download = `tiny-tale-${topic
+        .replace(/[^a-z0-9]/gi, "-")
+        .toLowerCase()}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (error) {
+      console.error("Failed to generate image:", error);
+    } finally {
+      setIsGeneratingImage(false);
+      if (printContainerRef.current) {
+        printContainerRef.current.style.display = "none";
+      }
+    }
   };
 
   // Split story into segments for pairing with images
@@ -419,11 +458,16 @@ function App() {
                   <span>📖</span> Your Story
                 </h2>
                 <button
-                  onClick={printStory}
-                  className="p-2 bg-cyan-100 hover:bg-cyan-200 rounded-full transition-colors"
-                  title="Print story"
+                  onClick={downloadAsImage}
+                  disabled={isGeneratingImage}
+                  className="p-2 bg-cyan-100 hover:bg-cyan-200 rounded-full transition-colors disabled:opacity-50"
+                  title="Download as image"
                 >
-                  <Printer className="w-5 h-5 text-cyan-600" />
+                  {isGeneratingImage ? (
+                    <div className="w-5 h-5 border-2 border-cyan-300 border-t-cyan-600 rounded-full animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5 text-cyan-600" />
+                  )}
                 </button>
               </div>
 
@@ -559,6 +603,78 @@ function App() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Hidden Print Container for Image Export */}
+        <div
+          ref={printContainerRef}
+          className="absolute -left-[9999px] top-0"
+          style={{ display: "none" }}
+        >
+          <div className="w-[800px] bg-gradient-to-br from-amber-50 via-white to-pink-50 font-lexend p-8">
+            {/* Decorative top border */}
+            <div className="h-2 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 rounded-full mb-6" />
+
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <span className="text-3xl">📖</span>
+                <h1 className="text-4xl font-bold font-comic rainbow-text">
+                  Tiny Tales
+                </h1>
+                <span className="text-3xl">✨</span>
+              </div>
+              <p className="text-gray-500 text-sm">
+                A story about:{" "}
+                <strong className="text-pink-500">{topic}</strong>
+              </p>
+            </div>
+
+            {/* Images Grid */}
+            {imageUrls.length > 0 && (
+              <div
+                className={`grid gap-3 mb-6 ${
+                  imageUrls.length === 1
+                    ? "grid-cols-1"
+                    : imageUrls.length === 3
+                    ? "grid-cols-3"
+                    : "grid-cols-2"
+                }`}
+              >
+                {imageUrls.map((url, index) => (
+                  <div
+                    key={index}
+                    className="rounded-xl overflow-hidden border-3 border-yellow-300 shadow-lg bg-white"
+                  >
+                    <img
+                      src={url}
+                      alt={`Story illustration ${index + 1}`}
+                      className={`w-full object-cover block ${
+                        imageUrls.length === 1 ? "h-72" : "h-44"
+                      }`}
+                      crossOrigin="anonymous"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Story Text Card */}
+            <div className="bg-white/80 backdrop-blur rounded-2xl p-6 border-3 border-yellow-300 shadow-lg">
+              <p className="text-xl leading-relaxed text-gray-800 font-lexend font-medium">
+                {story}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center mt-5 flex items-center justify-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+              <p className="text-xs text-gray-400 px-3">
+                Made with Tiny Tales ✨
+              </p>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
