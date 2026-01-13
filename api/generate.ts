@@ -3,7 +3,16 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 interface RequestBody {
   topic: string;
   maxLetters: number;
+  model?: string;
 }
+
+// Allowed models (to prevent arbitrary model injection)
+const ALLOWED_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-3-flash-preview",
+];
 
 export default async function handler(req: Request): Promise<Response> {
   // Only allow POST requests
@@ -31,7 +40,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const body: RequestBody = await req.json();
-    const { topic, maxLetters } = body;
+    const { topic, maxLetters, model: requestedModel } = body;
 
     // Validate input
     if (!topic || typeof topic !== "string") {
@@ -54,9 +63,15 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
+    // Use requested model if valid, otherwise default
+    const modelName =
+      requestedModel && ALLOWED_MODELS.includes(requestedModel)
+        ? requestedModel
+        : "gemini-2.5-flash";
+
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     // Create the prompt
     const prompt = `Create a simple, fun children's story about "${topic}".
@@ -76,34 +91,9 @@ Examples of ${maxLetters}-letter words or shorter: ${getExampleWords(
 
 Write only the story text, nothing else. No titles, no explanations, just the story.`;
 
-    // Generate the story
+    // Generate the story (single attempt to avoid timeout)
     const result = await model.generateContent(prompt);
     const story = result.response.text().trim();
-
-    // Validate that words don't exceed the limit (basic check)
-    const words = story.split(/\s+/);
-    const longWords = words.filter((word) => {
-      // Remove punctuation for checking
-      const cleanWord = word.replace(/[^a-zA-Z]/g, "");
-      return cleanWord.length > maxLetters;
-    });
-
-    if (longWords.length > 0) {
-      // If there are words that are too long, try to regenerate once
-      console.log("Found long words, regenerating:", longWords);
-      const retryResult = await model.generateContent(
-        prompt +
-          "\n\nREMINDER: Every single word MUST be " +
-          maxLetters +
-          " letters or fewer!"
-      );
-      const retryStory = retryResult.response.text().trim();
-
-      return new Response(JSON.stringify({ story: retryStory }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
 
     return new Response(JSON.stringify({ story }), {
       status: 200,
@@ -200,6 +190,7 @@ function getExampleWords(maxLetters: number): string {
   return (examples[maxLetters] || examples[5]).join(", ");
 }
 
+// Use Node.js serverless runtime (allows longer timeout than Edge)
 export const config = {
-  runtime: "edge",
+  maxDuration: 60, // Max allowed on Hobby plan
 };

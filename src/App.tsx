@@ -1,5 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Sparkles, BookOpen, Wand2, RotateCcw, Printer, Trash2, History, X, Volume2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Sparkles,
+  BookOpen,
+  Wand2,
+  RotateCcw,
+  Printer,
+  Trash2,
+  History,
+  X,
+  Volume2,
+} from "lucide-react";
 
 interface Story {
   id: string;
@@ -9,14 +19,33 @@ interface Story {
   createdAt: number;
 }
 
-const STORAGE_KEY = 'tiny-tales-stories';
+const STORAGE_KEY = "tiny-tales-stories";
+
+const AVAILABLE_MODELS = [
+  {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    description: "Recommended",
+  },
+  {
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    description: "Fastest",
+  },
+  {
+    id: "gemini-3-flash-preview",
+    name: "Gemini 3 Flash Preview",
+    description: "Newest (beta)",
+  },
+];
 
 function App() {
-  const [topic, setTopic] = useState('');
+  const [topic, setTopic] = useState("");
   const [maxLetters, setMaxLetters] = useState(5);
-  const [story, setStory] = useState('');
+  const [model, setModel] = useState("gemini-2.5-flash");
+  const [story, setStory] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [savedStories, setSavedStories] = useState<Story[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -33,14 +62,14 @@ function App() {
       try {
         setSavedStories(JSON.parse(stored));
       } catch {
-        console.error('Failed to parse stored stories');
+        console.error("Failed to parse stored stories");
       }
     }
   }, []);
 
   // Save stories to localStorage
   const saveStory = useCallback((newStory: Story) => {
-    setSavedStories(prev => {
+    setSavedStories((prev) => {
       const updated = [newStory, ...prev].slice(0, 10); // Keep last 10 stories
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
@@ -51,24 +80,25 @@ function App() {
     if (!topic.trim()) return;
 
     setIsLoading(true);
-    setError('');
-    setStory('');
+    setError("");
+    setStory("");
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
+      const response = await fetch("/api/generate", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           topic: topic.trim(),
           maxLetters,
+          model,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Something went wrong');
+        throw new Error(errorData.error || "Something went wrong");
       }
 
       const data = await response.json();
@@ -86,7 +116,7 @@ function App() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Oops! Our story wizard took a nap. Please try again! 🧙‍♂️💤'
+          : "Oops! Our story wizard took a nap. Please try again! 🧙‍♂️💤"
       );
     } finally {
       setIsLoading(false);
@@ -110,7 +140,7 @@ function App() {
   };
 
   const speakStory = () => {
-    if ('speechSynthesis' in window && story) {
+    if ("speechSynthesis" in window && story) {
       const utterance = new SpeechSynthesisUtterance(story);
       utterance.rate = 0.8;
       utterance.pitch = 1.1;
@@ -121,7 +151,7 @@ function App() {
   // Render story with word highlighting
   const renderStory = (text: string) => {
     return text.split(/(\s+)/).map((word, index) => {
-      if (word.trim() === '') {
+      if (word.trim() === "") {
         return <span key={index}>{word}</span>;
       }
       return (
@@ -132,7 +162,17 @@ function App() {
     });
   };
 
-  const letterLabels = ['', '', '', 'CAT', 'BIRD', 'HORSE', 'RABBIT', 'DOLPHIN', 'ELEPHANT'];
+  const letterLabels = [
+    "",
+    "",
+    "",
+    "CAT",
+    "BIRD",
+    "HORSE",
+    "RABBIT",
+    "DOLPHIN",
+    "ELEPHANT",
+  ];
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -174,14 +214,15 @@ function App() {
                 placeholder="A brave cat, magical forest, funny robot..."
                 className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm"
                 disabled={isLoading}
-                onKeyDown={(e) => e.key === 'Enter' && generateStory()}
+                onKeyDown={(e) => e.key === "Enter" && generateStory()}
               />
             </div>
 
             {/* Max Letters Slider */}
-            <div className="mb-8">
+            <div className="mb-6">
               <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
-                📏 Maximum letters per word: <span className="text-pink-500">{maxLetters}</span>
+                📏 Maximum letters per word:{" "}
+                <span className="text-pink-500">{maxLetters}</span>
               </label>
               <div className="relative">
                 <input
@@ -193,7 +234,7 @@ function App() {
                   className="w-full h-3 bg-gradient-to-r from-green-300 via-cyan-300 to-purple-300 rounded-full appearance-none cursor-pointer slider-thumb"
                   disabled={isLoading}
                   style={{
-                    WebkitAppearance: 'none',
+                    WebkitAppearance: "none",
                   }}
                 />
                 <style>{`
@@ -219,10 +260,34 @@ function App() {
                 `}</style>
                 <div className="flex justify-between text-sm text-gray-500 mt-1 font-lexend">
                   <span>3</span>
-                  <span className="text-xs text-gray-400">(like "{letterLabels[maxLetters]}")</span>
+                  <span className="text-xs text-gray-400">
+                    (like "{letterLabels[maxLetters]}")
+                  </span>
                   <span>8</span>
                 </div>
               </div>
+            </div>
+
+            {/* Model Selector */}
+            <div className="mb-8">
+              <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
+                🤖 AI Model
+              </label>
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                disabled={isLoading}
+                className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
+              >
+                {AVAILABLE_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} — {m.description}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1 font-lexend">
+                Different models may have separate rate limits
+              </p>
             </div>
 
             {/* Generate Button */}
@@ -277,8 +342,12 @@ function App() {
                   <Wand2 className="w-8 h-8 text-purple-500 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
                 </div>
                 <div className="text-left">
-                  <p className="text-xl font-bold text-gray-700 font-comic">Crafting your story...</p>
-                  <p className="text-gray-500 font-lexend">Our wizard is writing something special! ✨</p>
+                  <p className="text-xl font-bold text-gray-700 font-comic">
+                    Crafting your story...
+                  </p>
+                  <p className="text-gray-500 font-lexend">
+                    Our wizard is writing something special! ✨
+                  </p>
                 </div>
               </div>
             </div>
@@ -354,7 +423,8 @@ function App() {
                         {savedStory.topic}
                       </p>
                       <p className="text-sm text-gray-500 font-lexend mt-1">
-                        Max {savedStory.maxLetters} letters • {new Date(savedStory.createdAt).toLocaleDateString()}
+                        Max {savedStory.maxLetters} letters •{" "}
+                        {new Date(savedStory.createdAt).toLocaleDateString()}
                       </p>
                       <p className="text-gray-600 font-lexend mt-2 line-clamp-2 text-sm">
                         {savedStory.content.slice(0, 100)}...
