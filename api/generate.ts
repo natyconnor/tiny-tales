@@ -79,38 +79,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const model = genAI.getGenerativeModel({ model: modelName });
     log("Gemini client initialized");
 
-    // Create the prompt - now requesting JSON with story + 4 image prompts
-    const prompt = `Create a simple, fun children's story about "${topic}" along with 4 illustration prompts.
+    // Create the prompt - now requesting JSON with story + character descriptions + image prompts
+    const prompt = `Create a simple, fun children's story about "${topic}" with detailed character descriptions and 4 illustration prompts.
+
+=== PART 1: STORY TEXT ===
+Write a story for early readers (ages 4-7) where ALL words are ${maxLetters} letters or fewer.
 
 STORY RULES:
-1. ALL words in the story MUST be ${maxLetters} letters or fewer. This is critical - no exceptions!
-2. Use simple, easy-to-read language appropriate for early readers (ages 4-7)
-3. The story should be exactly 5-8 sentences long. The sentences don't have to be complete sentences
-4. Make it engaging, fun, and age-appropriate
-5. Use short, simple sentences
-6. Include descriptive words that help paint a picture
-7. End with a positive or happy conclusion
-8. The longer the words, the more complex the story can be
+1. ALL words MUST be ${maxLetters} letters or fewer - NO EXCEPTIONS!
+2. Exactly 5-8 short, simple sentences (fragments are okay)
+3. Make it engaging, fun, and age-appropriate
+4. End with a positive or happy conclusion
+5. The longer the words, the more complex the story can be
 
-Examples of ${maxLetters}-letter words or shorter: ${getExampleWords(
-      maxLetters
-    )}
+Examples of ${maxLetters}-letter words: ${getExampleWords(maxLetters)}
 
-IMAGE PROMPT RULES:
-1. Create exactly 4 image prompts for key moments in the story
-2. Each prompt MUST start with: "whimsical watercolor children's book illustration:"
-3. Keep the main character/subject consistent across all 4 prompts
-4. Make prompts descriptive but concise (under 100 characters after the prefix)
-5. Prompts should be child-friendly and match the story's tone
+=== PART 2: CHARACTER DESCRIPTIONS ===
+For EACH character or important object in your story, provide a detailed visual description.
+These are NOT limited by word length - be descriptive!
 
-Respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
+Include for each character:
+- Species/type (e.g., "orange tabby cat", "small gray mouse")
+- Key visual features (colors, patterns, size, clothing if any)
+- Personality expressed through appearance (cheerful smile, curious eyes, etc.)
+
+=== PART 3: IMAGE PROMPTS ===
+Create 4 image prompts for key story moments. Each prompt must:
+
+1. Start with: "whimsical watercolor children's book illustration:"
+2. Include the FULL character description (from Part 2) for any character in that scene
+3. Describe the action/scene from that part of the story
+4. Include setting details (grassy meadow, cozy kitchen, sunny garden, etc.)
+5. Maintain a consistent art style description
+
+CRITICAL: The image prompts must be self-contained - each one should fully describe the characters as if it's the only context the image generator will see. Never use pronouns or short names alone - always include the visual description.
+
+Example of a GOOD prompt:
+"whimsical watercolor children's book illustration: a cheerful orange tabby cat with bright green eyes and a white chest chasing a tiny gray mouse with big pink ears and a long curly tail through a sunny meadow filled with colorful wildflowers"
+
+Example of a BAD prompt:
+"whimsical watercolor children's book illustration: Pat chases Tim through a meadow"
+(Bad because it uses names without descriptions - image generator doesn't know what Pat and Tim look like!)
+
+=== RESPONSE FORMAT ===
+Respond with ONLY valid JSON (no markdown, no code blocks):
 {
-  "story": "The story text here...",
+  "story": "The simple story text with ${maxLetters}-letter-max words...",
+  "characters": {
+    "characterName": "Full visual description of this character"
+  },
   "imagePrompts": [
-    "whimsical watercolor children's book illustration: first scene description",
-    "whimsical watercolor children's book illustration: second scene description",
-    "whimsical watercolor children's book illustration: third scene description",
-    "whimsical watercolor children's book illustration: fourth scene description"
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 1 description]",
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 2 description]",
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 3 description]",
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 4 description]"
   ]
 }`;
 
@@ -123,7 +145,11 @@ Respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
     log(`Response received: ${responseText.length} chars`);
 
     // Parse the JSON response
-    let parsed: { story: string; imagePrompts: string[] };
+    let parsed: {
+      story: string;
+      characters?: Record<string, string>;
+      imagePrompts: string[];
+    };
     try {
       // Remove any markdown code block markers if present
       const cleanJson = responseText
@@ -151,15 +177,23 @@ Respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
       ? parsed.imagePrompts.slice(0, 4)
       : [];
 
+    // Log characters if present
+    if (parsed.characters) {
+      log(`Characters defined: ${Object.keys(parsed.characters).join(", ")}`);
+      Object.entries(parsed.characters).forEach(([name, desc]) => {
+        log(`  ${name}: ${desc.slice(0, 80)}${desc.length > 80 ? "..." : ""}`);
+      });
+    }
+
     log(
       `Story generated: ${parsed.story.length} chars, ${imagePrompts.length} image prompts`
     );
 
-    // Log each image prompt
+    // Log each image prompt (show more chars since they should be more descriptive now)
     imagePrompts.forEach((prompt, i) => {
       log(
-        `Image prompt ${i + 1}: ${prompt.slice(0, 100)}${
-          prompt.length > 100 ? "..." : ""
+        `Image prompt ${i + 1}: ${prompt.slice(0, 150)}${
+          prompt.length > 150 ? "..." : ""
         }`
       );
     });
@@ -174,6 +208,7 @@ Respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
 
     return res.status(200).json({
       story: parsed.story,
+      characters: parsed.characters || {},
       imagePrompts,
       imageUrls,
       debug: {
