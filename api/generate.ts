@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import type { IncomingMessage, ServerResponse } from "http";
 
 // Vercel serverless types
@@ -17,13 +17,21 @@ interface RequestBody {
   topic: string;
   maxLetters: number;
   model?: string;
+  imageModel?: string;
 }
 
-// Allowed models (to prevent arbitrary model injection)
+// Allowed text models (to prevent arbitrary model injection)
 const ALLOWED_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
   "gemini-3-flash-preview",
+];
+
+// Allowed image models
+const ALLOWED_IMAGE_MODELS = [
+  "pollinations", // External service (unlimited, lower quality)
+  "gemini-2.5-flash-image", // Nano Banana (fast, ~500/day free)
+  "gemini-3-pro-image-preview", // Nano Banana Pro (best quality, limited)
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -51,9 +59,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // In Node.js serverless, body is already parsed
     const body = req.body as RequestBody;
-    const { topic, maxLetters, model: requestedModel } = body;
+    const {
+      topic,
+      maxLetters,
+      model: requestedModel,
+      imageModel: requestedImageModel,
+    } = body;
     log(
-      `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}`
+      `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}, imageModel=${requestedImageModel}`
     );
 
     // Validate input
@@ -72,11 +85,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       requestedModel && ALLOWED_MODELS.includes(requestedModel)
         ? requestedModel
         : "gemini-2.5-flash-lite";
-    log(`Using model: ${modelName}`);
+    log(`Using text model: ${modelName}`);
 
-    // Initialize Gemini
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: modelName });
+    // Use requested image model if valid, otherwise default to pollinations
+    const imageModelName =
+      requestedImageModel && ALLOWED_IMAGE_MODELS.includes(requestedImageModel)
+        ? requestedImageModel
+        : "pollinations";
+    log(`Using image model: ${imageModelName}`);
+
+    // Initialize Gemini (unified SDK for text + image)
+    const ai = new GoogleGenAI({ apiKey });
     log("Gemini client initialized");
 
     // Create the prompt - now requesting JSON with story + character descriptions + image prompts
@@ -138,10 +157,13 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 
     // Generate the story and image prompts
     log("Calling Gemini API...");
-    const result = await model.generateContent(prompt);
+    const result = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+    });
     log("Gemini API responded");
 
-    const responseText = result.response.text().trim();
+    const responseText = result.text?.trim() ?? "";
     log(`Response received: ${responseText.length} chars`);
 
     // Parse the JSON response
@@ -198,13 +220,26 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       );
     });
 
-    // Build Pollinations URLs for each image prompt (only log once to avoid spam)
-    const imageUrls = imagePrompts.map((prompt, i) =>
-      buildPollinationsUrl(prompt, i === 0 ? log : undefined)
-    );
+    // Generate images based on selected image model
+    let imageUrls: string[];
 
-    // Log summary of URLs
-    log(`Generated ${imageUrls.length} Pollinations URLs`);
+    if (imageModelName === "pollinations") {
+      // Build Pollinations URLs for each image prompt (only log once to avoid spam)
+      imageUrls = imagePrompts.map((prompt, i) =>
+        buildPollinationsUrl(prompt, i === 0 ? log : undefined)
+      );
+      log(`Generated ${imageUrls.length} Pollinations URLs`);
+    } else {
+      // Use Gemini Nano Banana for image generation
+      log(`Generating images with ${imageModelName}...`);
+      imageUrls = await generateNanoBananaImages(
+        ai,
+        imageModelName,
+        imagePrompts,
+        log
+      );
+      log(`Generated ${imageUrls.length} Nano Banana images`);
+    }
 
     return res.status(200).json({
       story: parsed.story,
@@ -214,6 +249,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       debug: {
         time: Date.now() - startTime,
         model: modelName,
+        imageModel: imageModelName,
         pollinationsKeyConfigured: !!process.env.POLLINATIONS_API_KEY,
       },
     });
@@ -369,6 +405,79 @@ function buildPollinationsUrl(
   }
 
   return url;
+}
+
+/**
+ * Generates images using Gemini's Nano Banana models
+ * Returns base64 data URLs that can be displayed directly
+ */
+async function generateNanoBananaImages(
+  ai: GoogleGenAI,
+  model: string,
+  prompts: string[],
+  log: (msg: string) => void
+): Promise<string[]> {
+  const imageUrls: string[] = [];
+
+  // Generate images sequentially to avoid rate limiting
+  for (let i = 0; i < prompts.length; i++) {
+    const prompt = prompts[i];
+    log(`Generating image ${i + 1}/${prompts.length}...`);
+
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseModalities: ["image"],
+          imageConfig: {
+            aspectRatio: "4:3", // Good for storybook illustrations
+          },
+        },
+      });
+
+      // Extract image from response
+      const candidates = response.candidates;
+      if (candidates && candidates.length > 0) {
+        const parts = candidates[0].content?.parts;
+        if (parts) {
+          for (const part of parts) {
+            if (part.inlineData?.data) {
+              const mimeType = part.inlineData.mimeType || "image/png";
+              const dataUrl = `data:${mimeType};base64,${part.inlineData.data}`;
+              imageUrls.push(dataUrl);
+              log(`Image ${i + 1} generated successfully`);
+              break;
+            }
+          }
+        }
+      }
+
+      // If we didn't get an image, add a placeholder
+      if (imageUrls.length <= i) {
+        log(`Warning: No image data in response for prompt ${i + 1}`);
+        // Don't add a placeholder URL, just skip
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      log(`Error generating image ${i + 1}: ${errorMessage}`);
+
+      // Check if it's a rate limit error
+      if (
+        errorMessage.includes("429") ||
+        errorMessage.toLowerCase().includes("rate")
+      ) {
+        log(
+          `Rate limit hit. You may have exceeded your daily free tier limit.`
+        );
+        // Stop trying more images if rate limited
+        break;
+      }
+    }
+  }
+
+  return imageUrls;
 }
 
 // Node.js serverless config

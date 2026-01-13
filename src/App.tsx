@@ -39,10 +39,29 @@ const AVAILABLE_MODELS = [
   },
 ];
 
+const IMAGE_MODELS = [
+  {
+    id: "pollinations",
+    name: "Pollinations (Flux)",
+    description: "Unlimited, may have artifacts",
+  },
+  {
+    id: "gemini-2.5-flash-image",
+    name: "Nano Banana",
+    description: "Better quality (~500/day free)",
+  },
+  {
+    id: "gemini-3-pro-image-preview",
+    name: "Nano Banana Pro ✨",
+    description: "Best quality (limited free tier)",
+  },
+];
+
 function App() {
   const [topic, setTopic] = useState("");
   const [maxLetters, setMaxLetters] = useState(5);
   const [model, setModel] = useState("gemini-2.5-flash-lite");
+  const [imageModel, setImageModel] = useState("pollinations");
   const [story, setStory] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [loadedImages, setLoadedImages] = useState<boolean[]>([]);
@@ -97,6 +116,7 @@ function App() {
           topic: topic.trim(),
           maxLetters,
           model,
+          imageModel,
         }),
       });
 
@@ -326,9 +346,9 @@ function App() {
             </div>
 
             {/* Model Selector */}
-            <div className="mb-8">
+            <div className="mb-6">
               <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
-                🤖 AI Model
+                🤖 Story AI
               </label>
               <select
                 value={model}
@@ -342,8 +362,31 @@ function App() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Image Model Selector */}
+            <div className="mb-8">
+              <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
+                🎨 Image AI
+              </label>
+              <select
+                value={imageModel}
+                onChange={(e) => setImageModel(e.target.value)}
+                disabled={isLoading}
+                className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
+              >
+                {IMAGE_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} — {m.description}
+                  </option>
+                ))}
+              </select>
               <p className="text-xs text-gray-400 mt-1 font-lexend">
-                Different models may have separate rate limits
+                {imageModel === "pollinations"
+                  ? "Fast & unlimited, but may have visual artifacts"
+                  : imageModel === "gemini-2.5-flash-image"
+                  ? "Better quality images using Google's Nano Banana"
+                  : "Best quality images using Nano Banana Pro (may have daily limits)"}
               </p>
             </div>
 
