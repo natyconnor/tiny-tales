@@ -135,41 +135,29 @@ body {
     padding: 24px !important;
     margin: 0 !important;
     max-width: 100% !important;
+  }
+
+  /* Story page layout for print */
+  .story-page {
     page-break-inside: avoid;
+    margin-bottom: 24px !important;
   }
 
-  .storybook-content {
-    page-break-inside: avoid;
-  }
-
-  /* Image grid for print */
-  .storybook-content .grid {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 16px !important;
-    margin-bottom: 20px !important;
-  }
-
-  .storybook-content .grid > div {
-    aspect-ratio: 1 / 1;
-    border-radius: 12px !important;
-    overflow: hidden;
-    border: 2px solid #E5E7EB;
-  }
-
-  .storybook-content .grid img {
+  .story-page img {
     width: 100% !important;
-    height: 100% !important;
+    max-height: 300px !important;
     object-fit: cover !important;
     opacity: 1 !important;
+    border-radius: 12px !important;
+    border: 2px solid #E5E7EB;
   }
 
   /* Story text for print */
   .story-text {
-    font-size: 18pt !important;
-    line-height: 1.6 !important;
+    font-size: 16pt !important;
+    line-height: 1.5 !important;
     color: #1F2937 !important;
-    margin: 20px 0 !important;
+    margin-top: 12px !important;
   }
 
   .story-word {
