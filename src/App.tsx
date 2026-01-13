@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles, BookOpen, Wand2, RotateCcw, Printer, Trash2, History, X, Volume2 } from 'lucide-react';
 
 interface Story {
@@ -19,6 +19,12 @@ function App() {
   const [error, setError] = useState('');
   const [savedStories, setSavedStories] = useState<Story[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input on page load
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   // Load saved stories from localStorage
   useEffect(() => {
@@ -42,10 +48,7 @@ function App() {
   }, []);
 
   const generateStory = async () => {
-    if (!topic.trim()) {
-      setError('Please tell us what your story should be about! 📝');
-      return;
-    }
+    if (!topic.trim()) return;
 
     setIsLoading(true);
     setError('');
@@ -164,11 +167,12 @@ function App() {
                 🌟 What should the story be about?
               </label>
               <input
+                ref={inputRef}
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="A brave cat, magical forest, funny robot..."
-                className="w-full px-4 py-3 text-lg rounded-2xl border-3 border-cyan-300 focus:border-pink-400 focus:ring-4 focus:ring-pink-200 outline-none transition-all font-lexend placeholder:text-gray-400"
+                className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm"
                 disabled={isLoading}
                 onKeyDown={(e) => e.key === 'Enter' && generateStory()}
               />
@@ -224,8 +228,8 @@ function App() {
             {/* Generate Button */}
             <button
               onClick={generateStory}
-              disabled={isLoading}
-              className="w-full py-4 px-6 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 font-comic"
+              disabled={isLoading || !topic.trim()}
+              className="w-full py-4 px-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 font-comic"
             >
               {isLoading ? (
                 <>
@@ -259,8 +263,8 @@ function App() {
 
           {/* Error Message */}
           {error && (
-            <div className="mt-6 p-4 bg-red-100 border-2 border-red-300 rounded-2xl text-center animate-wiggle">
-              <p className="text-red-600 font-bold font-comic text-lg">{error}</p>
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-center">
+              <p className="text-red-600 font-medium font-lexend">{error}</p>
             </div>
           )}
 
