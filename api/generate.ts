@@ -17,7 +17,6 @@ interface RequestBody {
   topic: string;
   maxLetters: number;
   model?: string;
-  imageModel?: string;
 }
 
 // Allowed text models (to prevent arbitrary model injection)
@@ -25,13 +24,6 @@ const ALLOWED_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
   "gemini-3-flash-preview",
-];
-
-// Allowed image models
-const ALLOWED_IMAGE_MODELS = [
-  "pollinations", // External service (unlimited, lower quality)
-  "gemini-2.5-flash-image", // Nano Banana (fast, ~500/day free)
-  "gemini-3-pro-image-preview", // Nano Banana Pro (best quality, limited)
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -59,14 +51,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // In Node.js serverless, body is already parsed
     const body = req.body as RequestBody;
-    const {
-      topic,
-      maxLetters,
-      model: requestedModel,
-      imageModel: requestedImageModel,
-    } = body;
+    const { topic, maxLetters, model: requestedModel } = body;
     log(
-      `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}, imageModel=${requestedImageModel}`
+      `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}`
     );
 
     // Validate input
@@ -87,18 +74,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : "gemini-2.5-flash-lite";
     log(`Using text model: ${modelName}`);
 
-    // Use requested image model if valid, otherwise default to pollinations
-    const imageModelName =
-      requestedImageModel && ALLOWED_IMAGE_MODELS.includes(requestedImageModel)
-        ? requestedImageModel
-        : "pollinations";
-    log(`Using image model: ${imageModelName}`);
-
-    // Initialize Gemini (unified SDK for text + image)
+    // Initialize Gemini
     const ai = new GoogleGenAI({ apiKey });
     log("Gemini client initialized");
 
-    // Create the prompt - now requesting JSON with story + character descriptions + image prompts
+    // Create the prompt - requesting JSON with story + character descriptions + image prompts
     const prompt = `Create a simple, fun children's story about "${topic}" with detailed character descriptions and 4 illustration prompts.
 
 === PART 1: STORY TEXT ===
@@ -106,10 +86,10 @@ Write a story for early readers (ages 4-7) where ALL words are ${maxLetters} let
 
 STORY RULES:
 1. ALL words MUST be ${maxLetters} letters or fewer - NO EXCEPTIONS!
-2. Exactly 5-8 short, simple sentences (fragments are okay)
+2. Exactly 5-8 short, simple sentences (fragments are okay when the letter limit is low)
 3. Make it engaging, fun, and age-appropriate
 4. End with a positive or happy conclusion
-5. The longer the words, the more complex the story can be
+5. The longer the words, the more complex the story can be (more articles and such)
 
 Examples of ${maxLetters}-letter words: ${getExampleWords(maxLetters)}
 
@@ -123,22 +103,39 @@ Include for each character:
 - Personality expressed through appearance (cheerful smile, curious eyes, etc.)
 
 === PART 3: IMAGE PROMPTS ===
-Create 4 image prompts for key story moments. Each prompt must:
+Create 4 image prompts for key story moments. These will be used with an AI image generator, so follow these rules carefully:
 
-1. Start with: "whimsical watercolor children's book illustration:"
-2. Include the FULL character description (from Part 2) for any character in that scene
-3. Describe the action/scene from that part of the story
-4. Include setting details (grassy meadow, cozy kitchen, sunny garden, etc.)
-5. Maintain a consistent art style description
+STYLE (use this exact prefix for every prompt):
+"cute simple children's book illustration, flat colors, clean lines, minimal details:"
 
-CRITICAL: The image prompts must be self-contained - each one should fully describe the characters as if it's the only context the image generator will see. Never use pronouns or short names alone - always include the visual description.
+ANATOMY RULES (CRITICAL - AI often makes mistakes here):
+- Characters should be in simple, clear poses (standing, sitting, walking)
+- Show characters from front view or 3/4 view (easier for AI to render correctly)
+- If showing animals: use a cute, slightly cartoonish style with simple shapes
+- Avoid complex poses, foreshortening, or overlapping limbs
+- Keep hands/paws hidden or simple (behind back, in pockets, as simple circles)
+- Eyes should be large, round, and symmetrical - describe as "two large round eyes"
+- Faces should be simple: two eyes, small nose, simple smile
+
+COMPOSITION RULES:
+- Maximum 2 characters per scene
+- Clear separation between characters (not overlapping)
+- Simple backgrounds (solid color, simple gradient, or minimal elements)
+- Character should take up most of the frame
+
+Each prompt must:
+1. Start with the style prefix above
+2. Include the FULL character description (colors, features) - never use just names
+3. Describe a simple pose and clear action
+4. Specify "two large round symmetrical eyes" for any character with visible face
+5. Keep backgrounds simple
 
 Example of a GOOD prompt:
-"whimsical watercolor children's book illustration: a cheerful orange tabby cat with bright green eyes and a white chest chasing a tiny gray mouse with big pink ears and a long curly tail through a sunny meadow filled with colorful wildflowers"
+"cute simple children's book illustration, flat colors, clean lines, minimal details: a small orange tabby cat with two large round symmetrical eyes and a pink nose, standing on four legs facing forward, happy smile, fluffy tail raised, on a simple green grass background with blue sky"
 
 Example of a BAD prompt:
-"whimsical watercolor children's book illustration: Pat chases Tim through a meadow"
-(Bad because it uses names without descriptions - image generator doesn't know what Pat and Tim look like!)
+"whimsical watercolor illustration of Whiskers running through the magical forest chasing butterflies"
+(Bad: uses name without description, complex action, too many elements)
 
 === RESPONSE FORMAT ===
 Respond with ONLY valid JSON (no markdown, no code blocks):
@@ -148,10 +145,10 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
     "characterName": "Full visual description of this character"
   },
   "imagePrompts": [
-    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 1 description]",
-    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 2 description]",
-    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 3 description]",
-    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 4 description]"
+    "cute simple children's book illustration, flat colors, clean lines, minimal details: [full character description with symmetrical eyes noted] + [simple pose] + [simple background]",
+    "cute simple children's book illustration, flat colors, clean lines, minimal details: [scene 2]",
+    "cute simple children's book illustration, flat colors, clean lines, minimal details: [scene 3]",
+    "cute simple children's book illustration, flat colors, clean lines, minimal details: [scene 4]"
   ]
 }`;
 
@@ -211,7 +208,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       `Story generated: ${parsed.story.length} chars, ${imagePrompts.length} image prompts`
     );
 
-    // Log each image prompt (show more chars since they should be more descriptive now)
+    // Log each image prompt
     imagePrompts.forEach((prompt, i) => {
       log(
         `Image prompt ${i + 1}: ${prompt.slice(0, 150)}${
@@ -220,26 +217,11 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       );
     });
 
-    // Generate images based on selected image model
-    let imageUrls: string[];
-
-    if (imageModelName === "pollinations") {
-      // Build Pollinations URLs for each image prompt (only log once to avoid spam)
-      imageUrls = imagePrompts.map((prompt, i) =>
-        buildPollinationsUrl(prompt, i === 0 ? log : undefined)
-      );
-      log(`Generated ${imageUrls.length} Pollinations URLs`);
-    } else {
-      // Use Gemini Nano Banana for image generation
-      log(`Generating images with ${imageModelName}...`);
-      imageUrls = await generateNanoBananaImages(
-        ai,
-        imageModelName,
-        imagePrompts,
-        log
-      );
-      log(`Generated ${imageUrls.length} Nano Banana images`);
-    }
+    // Build Pollinations URLs for each image prompt
+    const imageUrls = imagePrompts.map((prompt, i) =>
+      buildPollinationsUrl(prompt, i === 0 ? log : undefined)
+    );
+    log(`Generated ${imageUrls.length} Pollinations URLs`);
 
     return res.status(200).json({
       story: parsed.story,
@@ -249,7 +231,6 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       debug: {
         time: Date.now() - startTime,
         model: modelName,
-        imageModel: imageModelName,
         pollinationsKeyConfigured: !!process.env.POLLINATIONS_API_KEY,
       },
     });
@@ -343,11 +324,6 @@ function getExampleWords(maxLetters: number): string {
 
 /**
  * Builds a Pollinations.ai image URL from a prompt
- * Supports optional API key for higher rate limits
- *
- * Per https://enter.pollinations.ai/api/docs#tag/genpollinationsai/GET/image/%7Bprompt%7D
- * - API key can be passed as query param: ?key=YOUR_API_KEY
- * - Or via Authorization header (not used here since we're building URLs)
  */
 function buildPollinationsUrl(
   prompt: string,
@@ -355,17 +331,14 @@ function buildPollinationsUrl(
 ): string {
   const pollinationsKey = process.env.POLLINATIONS_API_KEY;
 
-  // Per docs: default model is "zimage", default dimensions are 1024x1024
-  // Using 512x512 for faster loading in children's book context
   const params = new URLSearchParams({
     width: "512",
     height: "512",
-    model: "flux", // flux is still supported and good for illustrations
-    safe: "true", // Enable safety content filter for children's content
-    seed: "-1", // Random seed for variety
+    model: "flux",
+    safe: "true",
+    seed: "-1",
   });
 
-  // Log environment variable status
   if (log) {
     log(
       `POLLINATIONS_API_KEY: ${
@@ -378,7 +351,6 @@ function buildPollinationsUrl(
     );
   }
 
-  // If API key is configured, add it to bypass rate limits
   if (pollinationsKey) {
     params.set("key", pollinationsKey);
     if (log) {
@@ -397,7 +369,6 @@ function buildPollinationsUrl(
   )}?${params.toString()}`;
 
   if (log) {
-    // Log URL but redact the key for security
     const safeUrl = pollinationsKey
       ? url.replace(pollinationsKey, "[REDACTED]")
       : url;
@@ -407,80 +378,7 @@ function buildPollinationsUrl(
   return url;
 }
 
-/**
- * Generates images using Gemini's Nano Banana models
- * Returns base64 data URLs that can be displayed directly
- */
-async function generateNanoBananaImages(
-  ai: GoogleGenAI,
-  model: string,
-  prompts: string[],
-  log: (msg: string) => void
-): Promise<string[]> {
-  const imageUrls: string[] = [];
-
-  // Generate images sequentially to avoid rate limiting
-  for (let i = 0; i < prompts.length; i++) {
-    const prompt = prompts[i];
-    log(`Generating image ${i + 1}/${prompts.length}...`);
-
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          responseModalities: ["image"],
-          imageConfig: {
-            aspectRatio: "4:3", // Good for storybook illustrations
-          },
-        },
-      });
-
-      // Extract image from response
-      const candidates = response.candidates;
-      if (candidates && candidates.length > 0) {
-        const parts = candidates[0].content?.parts;
-        if (parts) {
-          for (const part of parts) {
-            if (part.inlineData?.data) {
-              const mimeType = part.inlineData.mimeType || "image/png";
-              const dataUrl = `data:${mimeType};base64,${part.inlineData.data}`;
-              imageUrls.push(dataUrl);
-              log(`Image ${i + 1} generated successfully`);
-              break;
-            }
-          }
-        }
-      }
-
-      // If we didn't get an image, add a placeholder
-      if (imageUrls.length <= i) {
-        log(`Warning: No image data in response for prompt ${i + 1}`);
-        // Don't add a placeholder URL, just skip
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      log(`Error generating image ${i + 1}: ${errorMessage}`);
-
-      // Check if it's a rate limit error
-      if (
-        errorMessage.includes("429") ||
-        errorMessage.toLowerCase().includes("rate")
-      ) {
-        log(
-          `Rate limit hit. You may have exceeded your daily free tier limit.`
-        );
-        // Stop trying more images if rate limited
-        break;
-      }
-    }
-  }
-
-  return imageUrls;
-}
-
 // Node.js serverless config
 export const config = {
-  maxDuration: 60, // Max allowed on Hobby plan
+  maxDuration: 60,
 };
