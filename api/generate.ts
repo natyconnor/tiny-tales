@@ -17,6 +17,7 @@ interface RequestBody {
   topic: string;
   maxLetters: number;
   model?: string;
+  imageModel?: string;
 }
 
 // Allowed text models (to prevent arbitrary model injection)
@@ -24,6 +25,17 @@ const ALLOWED_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
   "gemini-3-flash-preview",
+];
+
+// Allowed Pollinations image models
+// See: https://gen.pollinations.ai/image/models
+const ALLOWED_IMAGE_MODELS = [
+  "flux",           // Flux Schnell - Fast high-quality (default)
+  "nanobanana",     // Gemini 2.5 Flash Image
+  "nanobanana-pro", // Gemini 3 Pro Image (4K, Thinking)
+  "gptimage",       // OpenAI GPT Image 1 Mini
+  "seedream",       // ByteDance ARK (better quality)
+  "turbo",          // SDXL Turbo - Single-step real-time
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -51,9 +63,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // In Node.js serverless, body is already parsed
     const body = req.body as RequestBody;
-    const { topic, maxLetters, model: requestedModel } = body;
+    const { topic, maxLetters, model: requestedModel, imageModel: requestedImageModel } = body;
     log(
-      `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}`
+      `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}, imageModel=${requestedImageModel}`
     );
 
     // Validate input
@@ -73,6 +85,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? requestedModel
         : "gemini-2.5-flash-lite";
     log(`Using text model: ${modelName}`);
+
+    // Use requested image model if valid, otherwise default to flux
+    const imageModelName =
+      requestedImageModel && ALLOWED_IMAGE_MODELS.includes(requestedImageModel)
+        ? requestedImageModel
+        : "flux";
+    log(`Using image model: ${imageModelName}`);
 
     // Initialize Gemini
     const ai = new GoogleGenAI({ apiKey });
@@ -103,39 +122,22 @@ Include for each character:
 - Personality expressed through appearance (cheerful smile, curious eyes, etc.)
 
 === PART 3: IMAGE PROMPTS ===
-Create 4 image prompts for key story moments. These will be used with an AI image generator, so follow these rules carefully:
+Create 4 image prompts for key story moments. Each prompt must:
 
-STYLE (use this exact prefix for every prompt):
-"cute simple children's book illustration, flat colors, clean lines, minimal details:"
+1. Start with: "whimsical watercolor children's book illustration:"
+2. Include the FULL character description (from Part 2) for any character in that scene
+3. Describe the action/scene from that part of the story
+4. Include setting details (grassy meadow, cozy kitchen, sunny garden, etc.)
+5. Maintain a consistent art style description
 
-ANATOMY RULES (CRITICAL - AI often makes mistakes here):
-- Characters should be in simple, clear poses (standing, sitting, walking)
-- Show characters from front view or 3/4 view (easier for AI to render correctly)
-- If showing animals: use a cute, slightly cartoonish style with simple shapes
-- Avoid complex poses, foreshortening, or overlapping limbs
-- Keep hands/paws hidden or simple (behind back, in pockets, as simple circles)
-- Eyes should be large, round, and symmetrical - describe as "two large round eyes"
-- Faces should be simple: two eyes, small nose, simple smile
-
-COMPOSITION RULES:
-- Maximum 2 characters per scene
-- Clear separation between characters (not overlapping)
-- Simple backgrounds (solid color, simple gradient, or minimal elements)
-- Character should take up most of the frame
-
-Each prompt must:
-1. Start with the style prefix above
-2. Include the FULL character description (colors, features) - never use just names
-3. Describe a simple pose and clear action
-4. Specify "two large round symmetrical eyes" for any character with visible face
-5. Keep backgrounds simple
+CRITICAL: The image prompts must be self-contained - each one should fully describe the characters as if it's the only context the image generator will see. Never use pronouns or short names alone - always include the visual description.
 
 Example of a GOOD prompt:
-"cute simple children's book illustration, flat colors, clean lines, minimal details: a small orange tabby cat with two large round symmetrical eyes and a pink nose, standing on four legs facing forward, happy smile, fluffy tail raised, on a simple green grass background with blue sky"
+"whimsical watercolor children's book illustration: a cheerful orange tabby cat with bright green eyes and a white chest chasing a tiny gray mouse with big pink ears and a long curly tail through a sunny meadow filled with colorful wildflowers"
 
 Example of a BAD prompt:
-"whimsical watercolor illustration of Whiskers running through the magical forest chasing butterflies"
-(Bad: uses name without description, complex action, too many elements)
+"whimsical watercolor children's book illustration: Pat chases Tim through a meadow"
+(Bad because it uses names without descriptions - image generator doesn't know what Pat and Tim look like!)
 
 === RESPONSE FORMAT ===
 Respond with ONLY valid JSON (no markdown, no code blocks):
@@ -145,10 +147,10 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
     "characterName": "Full visual description of this character"
   },
   "imagePrompts": [
-    "cute simple children's book illustration, flat colors, clean lines, minimal details: [full character description with symmetrical eyes noted] + [simple pose] + [simple background]",
-    "cute simple children's book illustration, flat colors, clean lines, minimal details: [scene 2]",
-    "cute simple children's book illustration, flat colors, clean lines, minimal details: [scene 3]",
-    "cute simple children's book illustration, flat colors, clean lines, minimal details: [scene 4]"
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 1 description]",
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 2 description]",
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 3 description]",
+    "whimsical watercolor children's book illustration: [full character descriptions] + [scene 4 description]"
   ]
 }`;
 
@@ -219,7 +221,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 
     // Build Pollinations URLs for each image prompt
     const imageUrls = imagePrompts.map((prompt, i) =>
-      buildPollinationsUrl(prompt, i === 0 ? log : undefined)
+      buildPollinationsUrl(prompt, imageModelName, i === 0 ? log : undefined)
     );
     log(`Generated ${imageUrls.length} Pollinations URLs`);
 
@@ -231,6 +233,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       debug: {
         time: Date.now() - startTime,
         model: modelName,
+        imageModel: imageModelName,
         pollinationsKeyConfigured: !!process.env.POLLINATIONS_API_KEY,
       },
     });
@@ -324,9 +327,11 @@ function getExampleWords(maxLetters: number): string {
 
 /**
  * Builds a Pollinations.ai image URL from a prompt
+ * See available models at: https://gen.pollinations.ai/image/models
  */
 function buildPollinationsUrl(
   prompt: string,
+  model: string,
   log?: (msg: string) => void
 ): string {
   const pollinationsKey = process.env.POLLINATIONS_API_KEY;
@@ -334,7 +339,7 @@ function buildPollinationsUrl(
   const params = new URLSearchParams({
     width: "512",
     height: "512",
-    model: "flux",
+    model: model,
     safe: "true",
     seed: "-1",
   });
