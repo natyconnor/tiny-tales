@@ -21,6 +21,7 @@ interface Story {
 }
 
 const STORAGE_KEY = "tiny-tales-stories";
+const MAX_STORED_STORIES = 50;
 
 const AVAILABLE_MODELS = [
   {
@@ -90,6 +91,7 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
+  const [storageWarning, setStorageWarning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
 
@@ -113,7 +115,16 @@ function App() {
   // Save stories to localStorage
   const saveStory = useCallback((newStory: Story) => {
     setSavedStories((prev) => {
-      const updated = [newStory, ...prev].slice(0, 10); // Keep last 10 stories
+      const wasAtLimit = prev.length >= MAX_STORED_STORIES;
+      const updated = [newStory, ...prev].slice(0, MAX_STORED_STORIES);
+
+      // Show warning if we're at capacity and an old story was removed
+      if (wasAtLimit) {
+        setStorageWarning(true);
+        // Auto-hide warning after 5 seconds
+        setTimeout(() => setStorageWarning(false), 5000);
+      }
+
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
@@ -518,6 +529,19 @@ function App() {
             </div>
           )}
 
+          {/* Storage Warning */}
+          {storageWarning && (
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center">
+              <p className="text-amber-700 font-medium font-lexend">
+                ⚠️ Story saved! Your oldest story was removed to make room.
+              </p>
+              <p className="text-xs text-amber-600 font-lexend mt-1">
+                (You can keep up to {MAX_STORED_STORIES} stories in your
+                history)
+              </p>
+            </div>
+          )}
+
           {/* Loading Animation */}
           {isLoading && (
             <div className="mt-8 text-center">
@@ -650,10 +674,18 @@ function App() {
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-gray-700 font-comic flex items-center gap-2">
-                    <History className="w-6 h-6 text-purple-500" />
-                    Story History
-                  </h2>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-700 font-comic flex items-center gap-2">
+                      <History className="w-6 h-6 text-purple-500" />
+                      Story History
+                    </h2>
+                    {savedStories.length >= MAX_STORED_STORIES && (
+                      <p className="text-xs text-amber-600 font-lexend mt-1 ml-8">
+                        ⚠️ At capacity ({MAX_STORED_STORIES} stories). Oldest
+                        stories will be removed when you create new ones.
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={() => setShowHistory(false)}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
