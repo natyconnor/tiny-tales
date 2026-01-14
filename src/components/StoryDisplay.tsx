@@ -8,8 +8,6 @@ type StoryDisplayProps = {
   imageUrls: string[];
   loadedImages: boolean[];
   isGeneratingImage: boolean;
-  exportPreviewUrl: string | null;
-  exportFileName: string;
   onImageLoad: (index: number, event: SyntheticEvent<HTMLImageElement>) => void;
   onImageError: (index: number, url: string) => void;
   onDownloadImage: () => void;
@@ -34,8 +32,6 @@ export default function StoryDisplay({
   imageUrls,
   loadedImages,
   isGeneratingImage,
-  exportPreviewUrl,
-  exportFileName,
   onImageLoad,
   onImageError,
   onDownloadImage,
@@ -132,28 +128,6 @@ export default function StoryDisplay({
           ))
         )}
       </div>
-
-      {exportPreviewUrl && (
-        <div className="mt-6 bg-white rounded-3xl shadow-xl p-4 border-4 border-yellow-300">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-gray-700 font-comic">
-              🖼️ Export Preview
-            </h3>
-            <a
-              href={exportPreviewUrl}
-              download={exportFileName}
-              className="px-3 py-1.5 bg-cyan-100 hover:bg-cyan-200 text-cyan-700 rounded-lg text-sm font-lexend transition-colors"
-            >
-              Download PNG
-            </a>
-          </div>
-          <img
-            src={exportPreviewUrl}
-            alt="Export preview"
-            className="w-full rounded-2xl border-2 border-yellow-200"
-          />
-        </div>
-      )}
 
       {/* Generate Another Button */}
       <button

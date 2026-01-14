@@ -8,6 +8,7 @@ import {
 import { Wand2 } from "lucide-react";
 import AppHeader from "./components/AppHeader";
 import ExportPrintContainer from "./components/ExportPrintContainer";
+import ExportPreviewModal from "./components/ExportPreviewModal";
 import FloatingShapes from "./components/FloatingShapes";
 import HistoryModal from "./components/HistoryModal";
 import StoryDisplay from "./components/StoryDisplay";
@@ -37,6 +38,7 @@ function App() {
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [storageWarning, setStorageWarning] = useState(false);
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
 
@@ -243,7 +245,14 @@ function App() {
   const downloadAsImage = async () => {
     setIsGeneratingImage(true);
     try {
-      await generateExportPreview();
+      // If we already have a preview, just show the modal
+      if (exportPreviewUrl) {
+        setShowExportModal(true);
+      } else {
+        // Generate the preview first, then show modal
+        await generateExportPreview();
+        setShowExportModal(true);
+      }
     } finally {
       setIsGeneratingImage(false);
     }
@@ -333,8 +342,6 @@ function App() {
               imageUrls={imageUrls}
               loadedImages={loadedImages}
               isGeneratingImage={isGeneratingImage}
-              exportPreviewUrl={exportPreviewUrl}
-              exportFileName={exportFileName}
               onImageLoad={handleImageLoad}
               onImageError={handleImageError}
               onDownloadImage={downloadAsImage}
@@ -348,6 +355,14 @@ function App() {
               onClose={() => setShowHistory(false)}
               onLoadStory={loadStory}
               onClearHistory={clearHistory}
+            />
+          )}
+
+          {showExportModal && exportPreviewUrl && (
+            <ExportPreviewModal
+              previewUrl={exportPreviewUrl}
+              fileName={exportFileName}
+              onClose={() => setShowExportModal(false)}
             />
           )}
         </div>

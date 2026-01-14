@@ -36,6 +36,11 @@ body {
   background: linear-gradient(180deg, #FF69B4, #4169E1);
 }
 
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Story word hover effect */
 .story-word {
   display: inline-block;
