@@ -36,17 +36,30 @@ cd tiny-tales
 pnpm install
 ```
 
-3. Create a `.env` file in the root directory:
+3. Create a `.env.local` file in the root directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+POLLINATIONS_API_KEY=your_pollinations_api_key_here  # Optional
 ```
 
-4. Start the development server:
+4. Start the development servers:
 ```bash
-pnpm dev
+# Option 1: Run both frontend and API server together (recommended)
+pnpm dev:all
+
+# Option 2: Run them separately in different terminals
+pnpm dev:api    # API server on http://localhost:3001
+pnpm dev        # Frontend on http://localhost:5173
 ```
 
 5. Open [http://localhost:5173](http://localhost:5173) in your browser
+
+### Local Development Notes
+
+- The API server runs on port 3001 by default (configurable via `API_PORT` env variable)
+- Vite automatically proxies `/api/*` requests to the local API server
+- In production, API calls go directly to Vercel serverless functions
+- Make sure both servers are running when testing API calls locally
 
 ## 🌐 Deployment to Vercel
 
@@ -79,12 +92,13 @@ tiny-tales/
 │   ├── App.tsx          # Main application component
 │   ├── main.tsx         # React entry point
 │   └── index.css        # Tailwind & custom styles
+├── server.ts            # Local development API server
 ├── index.html           # HTML template
 ├── package.json
 ├── tailwind.config.js
 ├── tsconfig.json
 ├── vercel.json          # Vercel configuration
-└── vite.config.ts
+└── vite.config.ts       # Vite config with API proxy
 ```
 
 ## 🎯 How It Works
