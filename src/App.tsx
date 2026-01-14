@@ -42,36 +42,37 @@ const AVAILABLE_MODELS = [
 
 // Available Pollinations image models
 // See: https://gen.pollinations.ai/image/models
+// Cost per 1 pollen/day: flux=5K, turbo=3.3K, gptimage=70, seedream=35, nanobanana=25, nanobanana-pro=6
 const IMAGE_MODELS = [
   {
     id: "flux",
     name: "Flux Schnell",
-    description: "Fast & good quality (default)",
+    description: "Unlimited (default)",
   },
   {
     id: "nanobanana",
-    name: "Nano Banana",
-    description: "Gemini 2.5 Flash Image",
-  },
-  {
-    id: "nanobanana-pro",
-    name: "Nano Banana Pro ✨",
-    description: "Gemini 3 Pro (4K, best quality)",
+    name: "Nano Banana ⭐",
+    description: "Best quality (~6 stories/day)",
   },
   {
     id: "gptimage",
     name: "GPT Image",
-    description: "OpenAI's image model",
+    description: "OpenAI (~17 stories/day)",
   },
   {
     id: "seedream",
     name: "Seedream",
-    description: "ByteDance ARK (detailed)",
+    description: "ByteDance (~8 stories/day)",
   },
   {
     id: "turbo",
     name: "SDXL Turbo",
-    description: "Single-step, fastest",
+    description: "Fastest, unlimited",
+  },
+  {
+    id: "nanobanana-pro",
+    name: "Nano Banana Pro",
+    description: "4K quality (~1 story/day)",
   },
 ];
 

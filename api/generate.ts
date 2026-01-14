@@ -29,13 +29,14 @@ const ALLOWED_MODELS = [
 
 // Allowed Pollinations image models
 // See: https://gen.pollinations.ai/image/models
+// Images per 1 pollen: flux=5K, turbo=3.3K, gptimage=70, seedream=35, nanobanana=25, nanobanana-pro=6
 const ALLOWED_IMAGE_MODELS = [
-  "flux",           // Flux Schnell - Fast high-quality (default)
-  "nanobanana",     // Gemini 2.5 Flash Image
-  "nanobanana-pro", // Gemini 3 Pro Image (4K, Thinking)
-  "gptimage",       // OpenAI GPT Image 1 Mini
-  "seedream",       // ByteDance ARK (better quality)
-  "turbo",          // SDXL Turbo - Single-step real-time
+  "flux", // Flux Schnell - essentially unlimited
+  "nanobanana", // Gemini 2.5 Flash Image - ~6 stories/day
+  "gptimage", // OpenAI GPT Image 1 Mini - ~17 stories/day
+  "seedream", // ByteDance ARK - ~8 stories/day
+  "turbo", // SDXL Turbo - essentially unlimited
+  "nanobanana-pro", // Gemini 3 Pro Image - ~1 story/day (expensive!)
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -63,7 +64,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // In Node.js serverless, body is already parsed
     const body = req.body as RequestBody;
-    const { topic, maxLetters, model: requestedModel, imageModel: requestedImageModel } = body;
+    const {
+      topic,
+      maxLetters,
+      model: requestedModel,
+      imageModel: requestedImageModel,
+    } = body;
     log(
       `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}, imageModel=${requestedImageModel}`
     );
