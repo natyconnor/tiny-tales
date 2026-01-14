@@ -5,7 +5,6 @@ import {
   useRef,
   type SyntheticEvent,
 } from "react";
-import html2canvas from "html2canvas";
 import {
   Sparkles,
   BookOpen,
@@ -122,8 +121,404 @@ function App() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [storageWarning, setStorageWarning] = useState(false);
+  const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
+
+  const captureImageToDataUrl = (img: HTMLImageElement): string | null => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0);
+      return canvas.toDataURL("image/png");
+    } catch (err) {
+      console.warn("Could not capture image for export:", err);
+      return null;
+    }
+  };
+
+  const captureLoadedImagesFromDom = useCallback(() => {
+    const images = Array.from(
+      document.querySelectorAll<HTMLImageElement>("[data-story-image]")
+    );
+
+    if (images.length === 0) return;
+
+    setImageDataUrls((prev) => {
+      const updated = [...prev];
+      let changed = false;
+
+      images.forEach((img) => {
+        const index = Number(img.dataset.index);
+        if (Number.isNaN(index)) return;
+        if (!img.complete || img.naturalWidth === 0) return;
+        if (updated[index]) return;
+
+        const dataUrl = captureImageToDataUrl(img);
+        if (dataUrl) {
+          updated[index] = dataUrl;
+          changed = true;
+        }
+      });
+
+      return changed ? updated : prev;
+    });
+  }, []);
+
+  const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = dataUrl;
+    });
+  };
+
+  const wrapTextLines = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number
+  ): string[] => {
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let current = "";
+
+    for (const word of words) {
+      const test = current ? `${current} ${word}` : word;
+      const width = ctx.measureText(test).width;
+      if (width <= maxWidth || !current) {
+        current = test;
+      } else {
+        lines.push(current);
+        current = word;
+      }
+    }
+
+    if (current) {
+      lines.push(current);
+    }
+
+    return lines;
+  };
+
+  const splitStoryIntoSegments = useCallback(
+    (text: string, numSegments: number): string[] => {
+      const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+      const segments: string[] = [];
+      const sentencesPerSegment = Math.ceil(sentences.length / numSegments);
+
+      for (let i = 0; i < numSegments; i += 1) {
+        const start = i * sentencesPerSegment;
+        const end = start + sentencesPerSegment;
+        const segment = sentences.slice(start, end).join(" ").trim();
+        if (segment) {
+          segments.push(segment);
+        }
+      }
+
+      return segments;
+    },
+    []
+  );
+
+  const renderExportCanvas =
+    useCallback(async (): Promise<HTMLCanvasElement> => {
+      const segments = splitStoryIntoSegments(
+        story,
+        Math.max(imageUrls.length, 1)
+      );
+      const items = imageUrls.map((_, index) => ({
+        dataUrl: imageDataUrls[index],
+        segment: segments[index] || "",
+      }));
+
+      const canvasWidth = 600;
+      const padding = 24;
+      const gap = 12;
+      const columns = items.length === 1 ? 1 : 2;
+      const innerWidth = canvasWidth - padding * 2;
+      const cardWidth = (innerWidth - gap * (columns - 1)) / columns;
+      const imageSize = cardWidth;
+
+      const titleFont = '700 28px "Comic Neue", cursive';
+      const subtitleFont = '500 12px "Lexend", sans-serif';
+      const textFont = '500 13px "Lexend", sans-serif';
+      const lineHeight = 18;
+      const textPadX = 12;
+      const textPadY = 10;
+      const minTextHeight = 44;
+
+      if ("fonts" in document && document.fonts?.ready) {
+        try {
+          await document.fonts.ready;
+        } catch {
+          // Ignore font loading failures
+        }
+      }
+
+      const measureCanvas = document.createElement("canvas");
+      const measureCtx = measureCanvas.getContext("2d");
+      if (!measureCtx) {
+        throw new Error("Unable to create canvas context");
+      }
+
+      measureCtx.font = textFont;
+      const textLayouts = items.map((item) => {
+        const lines = wrapTextLines(
+          measureCtx,
+          item.segment,
+          cardWidth - textPadX * 2
+        );
+        const height = Math.max(
+          minTextHeight,
+          lines.length * lineHeight + textPadY * 2
+        );
+        return { lines, height };
+      });
+
+      const rowTextHeights: number[] = [];
+      for (let row = 0; row < Math.ceil(items.length / columns); row += 1) {
+        const start = row * columns;
+        const end = start + columns;
+        const rowItems = textLayouts.slice(start, end);
+        rowTextHeights.push(
+          rowItems.reduce(
+            (max, item) => Math.max(max, item.height),
+            minTextHeight
+          )
+        );
+      }
+
+      const topBarHeight = 6;
+      const headerGap = 12;
+      const titleHeight = 32;
+      const subtitleHeight = 16;
+      const gridTop =
+        padding + topBarHeight + headerGap + titleHeight + subtitleHeight + 8;
+
+      const gridHeight = rowTextHeights.reduce((total, rowHeight, rowIndex) => {
+        const rowCardHeight = imageSize + rowHeight;
+        return (
+          total +
+          rowCardHeight +
+          (rowIndex < rowTextHeights.length - 1 ? gap : 0)
+        );
+      }, 0);
+
+      const footerHeight = 16;
+      const canvasHeight = gridTop + gridHeight + 16 + footerHeight + padding;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasWidth * 2;
+      canvas.height = canvasHeight * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Unable to create canvas context");
+      }
+
+      const drawRoundedRect = (
+        rectCtx: CanvasRenderingContext2D,
+        x: number,
+        yPos: number,
+        width: number,
+        height: number,
+        radius: number
+      ) => {
+        const r = Math.min(radius, width / 2, height / 2);
+        rectCtx.beginPath();
+        rectCtx.moveTo(x + r, yPos);
+        rectCtx.lineTo(x + width - r, yPos);
+        rectCtx.quadraticCurveTo(x + width, yPos, x + width, yPos + r);
+        rectCtx.lineTo(x + width, yPos + height - r);
+        rectCtx.quadraticCurveTo(
+          x + width,
+          yPos + height,
+          x + width - r,
+          yPos + height
+        );
+        rectCtx.lineTo(x + r, yPos + height);
+        rectCtx.quadraticCurveTo(x, yPos + height, x, yPos + height - r);
+        rectCtx.lineTo(x, yPos + r);
+        rectCtx.quadraticCurveTo(x, yPos, x + r, yPos);
+        rectCtx.closePath();
+      };
+
+      const drawRoundedTopRect = (
+        rectCtx: CanvasRenderingContext2D,
+        x: number,
+        yPos: number,
+        width: number,
+        height: number,
+        radius: number
+      ) => {
+        const r = Math.min(radius, width / 2, height / 2);
+        rectCtx.beginPath();
+        rectCtx.moveTo(x + r, yPos);
+        rectCtx.lineTo(x + width - r, yPos);
+        rectCtx.quadraticCurveTo(x + width, yPos, x + width, yPos + r);
+        rectCtx.lineTo(x + width, yPos + height);
+        rectCtx.lineTo(x, yPos + height);
+        rectCtx.lineTo(x, yPos + r);
+        rectCtx.quadraticCurveTo(x, yPos, x + r, yPos);
+        rectCtx.closePath();
+      };
+
+      ctx.scale(2, 2);
+
+      const background = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+      background.addColorStop(0, "#FFFBEB");
+      background.addColorStop(1, "#FCE7F3");
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      const barGradient = ctx.createLinearGradient(
+        padding,
+        0,
+        canvasWidth - padding,
+        0
+      );
+      barGradient.addColorStop(0, "#F472B6");
+      barGradient.addColorStop(1, "#8B5CF6");
+      ctx.fillStyle = barGradient;
+      drawRoundedRect(ctx, padding, padding, innerWidth, topBarHeight, 4);
+      ctx.fill();
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#7C3AED";
+      ctx.font = titleFont;
+      ctx.fillText("Tiny Tales", canvasWidth / 2, padding + topBarHeight + 6);
+
+      ctx.font = subtitleFont;
+      const subtitleY = padding + topBarHeight + 6 + titleHeight - 6;
+      const label = "A story about:";
+      const labelWidth = ctx.measureText(label).width;
+      const topicWidth = ctx.measureText(topic).width;
+      const totalWidth = labelWidth + 6 + topicWidth;
+      const startX = (canvasWidth - totalWidth) / 2;
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#6B7280";
+      ctx.fillText(label, startX, subtitleY);
+      ctx.fillStyle = "#EC4899";
+      ctx.fillText(topic, startX + labelWidth + 6, subtitleY);
+
+      let y = gridTop;
+
+      const images = await Promise.all(
+        items.map((item) =>
+          item.dataUrl
+            ? loadImageFromDataUrl(item.dataUrl)
+            : Promise.resolve(null)
+        )
+      );
+
+      for (let row = 0; row < rowTextHeights.length; row += 1) {
+        const rowTextHeight = rowTextHeights[row];
+        const rowHeight = imageSize + rowTextHeight;
+
+        for (let col = 0; col < columns; col += 1) {
+          const index = row * columns + col;
+          if (!items[index]) continue;
+
+          const x = padding + col * (cardWidth + gap);
+          const layout = textLayouts[index];
+          const img = images[index];
+
+          ctx.save();
+          drawRoundedRect(ctx, x, y, cardWidth, rowHeight, 12);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#FACC15";
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          drawRoundedTopRect(ctx, x, y, cardWidth, imageSize, 12);
+          ctx.clip();
+
+          if (img) {
+            const scale = Math.min(
+              imageSize / img.width,
+              imageSize / img.height
+            );
+            const drawWidth = img.width * scale;
+            const drawHeight = img.height * scale;
+            const dx = x + (imageSize - drawWidth) / 2;
+            const dy = y + (imageSize - drawHeight) / 2;
+            ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
+          } else {
+            ctx.fillStyle = "#FEF3C7";
+            ctx.fillRect(x, y, imageSize, imageSize);
+          }
+          ctx.restore();
+
+          ctx.beginPath();
+          ctx.moveTo(x, y + imageSize);
+          ctx.lineTo(x + cardWidth, y + imageSize);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#FACC15";
+          ctx.stroke();
+
+          ctx.font = textFont;
+          ctx.fillStyle = "#374151";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+
+          const lines = layout.lines;
+          const textHeight = lines.length * lineHeight;
+          const textY = y + imageSize + (rowTextHeight - textHeight) / 2;
+          lines.forEach((line, lineIndex) => {
+            ctx.fillText(
+              line,
+              x + cardWidth / 2,
+              textY + lineIndex * lineHeight
+            );
+          });
+        }
+
+        y += rowHeight + (row < rowTextHeights.length - 1 ? gap : 0);
+      }
+
+      ctx.font = subtitleFont;
+      ctx.fillStyle = "#9CA3AF";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("Made with Tiny Tales ✨", canvasWidth / 2, y + 16);
+
+      return canvas;
+    }, [story, imageUrls, imageDataUrls, topic, splitStoryIntoSegments]);
+
+  // Auto-generate export preview when all images are loaded
+  const generateExportPreview = useCallback(async () => {
+    try {
+      const canvas = await renderExportCanvas();
+      setExportPreviewUrl(canvas.toDataURL("image/png"));
+    } catch (error) {
+      console.error("Failed to generate preview:", error);
+    }
+  }, [renderExportCanvas]);
+
+  // Auto-generate preview when all images are captured
+  useEffect(() => {
+    if (!story || imageUrls.length === 0) return;
+
+    const capturedCount = imageDataUrls.filter(Boolean).length;
+    if (capturedCount < imageUrls.length) return;
+
+    if (exportPreviewUrl) return;
+
+    generateExportPreview();
+  }, [
+    story,
+    imageUrls.length,
+    imageDataUrls,
+    exportPreviewUrl,
+    generateExportPreview,
+  ]);
 
   // Focus input on page load
   useEffect(() => {
@@ -169,6 +564,7 @@ function App() {
     setImageUrls([]);
     setLoadedImages([]);
     setImageDataUrls([]);
+    setExportPreviewUrl(null);
 
     try {
       const response = await fetch("/api/generate", {
@@ -284,75 +680,22 @@ function App() {
     setImageUrls(savedStory.imageUrls || []);
     setLoadedImages(new Array(savedStory.imageUrls?.length || 0).fill(false));
     setImageDataUrls([]); // Reset - will be populated as images load
+    setExportPreviewUrl(null);
     setShowHistory(false);
+
+    // Capture any cached images that may already be in the DOM
+    setTimeout(() => {
+      captureLoadedImagesFromDom();
+    }, 0);
   };
 
   const downloadAsImage = async () => {
-    if (!printContainerRef.current) {
-      console.error("Print container ref not found");
-      return;
-    }
-
     setIsGeneratingImage(true);
-    const container = printContainerRef.current;
-
     try {
-      // Position the container on-screen for html2canvas (it needs to be visible)
-      container.style.display = "block";
-      container.style.position = "fixed";
-      container.style.left = "0";
-      container.style.top = "0";
-      container.style.zIndex = "9999";
-
-      // Wait for layout to settle
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const canvas = await html2canvas(container, {
-        backgroundColor: "#fffbeb",
-        scale: 2,
-        logging: false,
-      });
-
-      // Create and trigger download
-      const link = document.createElement("a");
-      link.download = `tiny-tale-${topic
-        .replace(/[^a-z0-9]/gi, "-")
-        .toLowerCase()}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } catch (error) {
-      console.error("Failed to generate image:", error);
-      alert("Sorry, couldn't generate the image. Please try again!");
+      await generateExportPreview();
     } finally {
-      // Reset container to hidden
-      container.style.display = "none";
-      container.style.position = "absolute";
-      container.style.left = "-9999px";
-      container.style.zIndex = "auto";
       setIsGeneratingImage(false);
     }
-  };
-
-  // Split story into segments for pairing with images
-  const splitStoryIntoSegments = (
-    text: string,
-    numSegments: number
-  ): string[] => {
-    // Split by sentences (period, exclamation, or question mark followed by space)
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-    const segments: string[] = [];
-    const sentencesPerSegment = Math.ceil(sentences.length / numSegments);
-
-    for (let i = 0; i < numSegments; i++) {
-      const start = i * sentencesPerSegment;
-      const end = start + sentencesPerSegment;
-      const segment = sentences.slice(start, end).join(" ").trim();
-      if (segment) {
-        segments.push(segment);
-      }
-    }
-
-    return segments;
   };
 
   // Render story with word highlighting
@@ -389,6 +732,14 @@ function App() {
     dataUrl: imageDataUrls[index],
     segment: exportSegments[index] || "",
   }));
+  const exportFileName = (() => {
+    const slug = topic
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return `tiny-tale${slug ? `-${slug}` : ""}.png`;
+  })();
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -677,6 +1028,8 @@ function App() {
                           className={`w-full h-full object-cover transition-opacity duration-500 ${
                             loadedImages[index] ? "opacity-100" : "opacity-0"
                           }`}
+                          data-story-image
+                          data-index={index}
                           crossOrigin="anonymous"
                           onLoad={(e) => handleImageLoad(index, e)}
                           onError={() => handleImageError(index, url)}
@@ -693,6 +1046,28 @@ function App() {
                   ));
                 })()}
               </div>
+
+              {exportPreviewUrl && (
+                <div className="mt-6 bg-white rounded-3xl shadow-xl p-4 border-4 border-yellow-300">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-700 font-comic">
+                      🖼️ Export Preview
+                    </h3>
+                    <a
+                      href={exportPreviewUrl}
+                      download={exportFileName}
+                      className="px-3 py-1.5 bg-cyan-100 hover:bg-cyan-200 text-cyan-700 rounded-lg text-sm font-lexend transition-colors"
+                    >
+                      Download PNG
+                    </a>
+                  </div>
+                  <img
+                    src={exportPreviewUrl}
+                    alt="Export preview"
+                    className="w-full rounded-2xl border-2 border-yellow-200"
+                  />
+                </div>
+              )}
 
               {/* Generate Another Button */}
               <button
@@ -778,7 +1153,7 @@ function App() {
           )}
         </div>
 
-        {/* Hidden Print Container for Image Export */}
+        {/* Print Container for Image Export (hidden) */}
         <div
           ref={printContainerRef}
           data-print-container
@@ -807,13 +1182,16 @@ function App() {
             {/* Images Grid - uses captured data URLs from already-loaded images */}
             {exportItems.length > 0 && (
               <div
-                className={`grid gap-3 mb-4 ${
+                className={`grid gap-3 mb-4 items-start ${
                   exportItems.length === 1 ? "grid-cols-1" : "grid-cols-2"
                 }`}
               >
                 {exportItems.map((item, index) => (
-                  <div key={index} className="bg-white">
-                    <div className="aspect-square bg-amber-50 border-2 border-yellow-300 rounded-t-xl overflow-hidden">
+                  <div
+                    key={index}
+                    className="rounded-xl border-2 border-yellow-300 bg-white overflow-hidden"
+                  >
+                    <div className="aspect-square bg-amber-50">
                       {item.dataUrl ? (
                         <img
                           src={item.dataUrl}
@@ -826,8 +1204,8 @@ function App() {
                         </div>
                       )}
                     </div>
-                    <div className="border-2 border-t-0 border-yellow-300 rounded-b-xl px-3 py-2 min-h-[48px] flex items-center">
-                      <p className="text-sm leading-relaxed text-gray-700">
+                    <div className="border-t-2 border-yellow-300 px-3 py-4 text-center bg-white">
+                      <p className="text-sm leading-snug text-gray-700">
                         {item.segment}
                       </p>
                     </div>
