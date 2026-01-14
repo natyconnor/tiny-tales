@@ -89,40 +89,9 @@ function App() {
   const [savedStories, setSavedStories] = useState<Story[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [preloadedImages, setPreloadedImages] = useState<string[]>([]);
+  const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
-
-  // Preload images as data URLs when imageUrls change
-  useEffect(() => {
-    if (imageUrls.length === 0) {
-      setPreloadedImages([]);
-      return;
-    }
-
-    const loadImages = async () => {
-      const dataUrls = await Promise.all(
-        imageUrls.map(async (url) => {
-          try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            return new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.onerror = () => resolve(""); // Return empty on error
-              reader.readAsDataURL(blob);
-            });
-          } catch {
-            console.warn("Failed to preload image:", url);
-            return "";
-          }
-        })
-      );
-      setPreloadedImages(dataUrls);
-    };
-
-    loadImages();
-  }, [imageUrls]);
 
   // Focus input on page load
   useEffect(() => {
@@ -158,6 +127,7 @@ function App() {
     setStory("");
     setImageUrls([]);
     setLoadedImages([]);
+    setImageDataUrls([]);
 
     try {
       const response = await fetch("/api/generate", {
@@ -219,14 +189,37 @@ function App() {
     }
   };
 
-  // Handle image load completion
-  const handleImageLoad = (index: number) => {
+  // Handle image load completion - also capture as data URL for export
+  const handleImageLoad = (
+    index: number,
+    event: React.SyntheticEvent<HTMLImageElement>
+  ) => {
     console.log(`Image ${index + 1} loaded successfully`);
     setLoadedImages((prev) => {
       const updated = [...prev];
       updated[index] = true;
       return updated;
     });
+
+    // Convert the loaded image to a data URL for export (no extra network request!)
+    const img = event.currentTarget;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL("image/png");
+        setImageDataUrls((prev) => {
+          const updated = [...prev];
+          updated[index] = dataUrl;
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn(`Could not capture image ${index + 1} for export:`, err);
+    }
   };
 
   // Handle image load error
@@ -249,6 +242,7 @@ function App() {
     setStory(savedStory.content);
     setImageUrls(savedStory.imageUrls || []);
     setLoadedImages(new Array(savedStory.imageUrls?.length || 0).fill(false));
+    setImageDataUrls([]); // Reset - will be populated as images load
     setShowHistory(false);
   };
 
@@ -623,7 +617,8 @@ function App() {
                           className={`w-full h-full object-cover transition-opacity duration-500 ${
                             loadedImages[index] ? "opacity-100" : "opacity-0"
                           }`}
-                          onLoad={() => handleImageLoad(index)}
+                          crossOrigin="anonymous"
+                          onLoad={(e) => handleImageLoad(index, e)}
                           onError={() => handleImageError(index, url)}
                         />
                       </div>
@@ -726,16 +721,16 @@ function App() {
               </p>
             </div>
 
-            {/* Images Grid - uses preloaded data URLs for CORS compatibility */}
-            {preloadedImages.filter(Boolean).length > 0 && (
+            {/* Images Grid - uses captured data URLs from already-loaded images */}
+            {imageDataUrls.filter(Boolean).length > 0 && (
               <div
                 className={`grid gap-2 mb-4 ${
-                  preloadedImages.filter(Boolean).length === 1
+                  imageDataUrls.filter(Boolean).length === 1
                     ? "grid-cols-1"
                     : "grid-cols-2"
                 }`}
               >
-                {preloadedImages.map(
+                {imageDataUrls.map(
                   (dataUrl, index) =>
                     dataUrl && (
                       <div
