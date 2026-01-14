@@ -77,6 +77,23 @@ const IMAGE_MODELS = [
   },
 ];
 
+// Helper function to extract image model from a Pollinations URL
+const extractImageModelFromUrl = (url: string): string | null => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.searchParams.get("model") || null;
+  } catch {
+    return null;
+  }
+};
+
+// Helper function to get display name for image model
+const getImageModelDisplayName = (modelId: string | null): string => {
+  if (!modelId) return "Unknown";
+  const model = IMAGE_MODELS.find((m) => m.id === modelId);
+  return model ? model.name : modelId;
+};
+
 function App() {
   const [topic, setTopic] = useState("");
   const [maxLetters, setMaxLetters] = useState(5);
@@ -695,24 +712,39 @@ function App() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-3">
-                  {savedStories.map((savedStory) => (
-                    <button
-                      key={savedStory.id}
-                      onClick={() => loadStory(savedStory)}
-                      className="w-full p-4 bg-gradient-to-r from-pink-50 to-cyan-50 hover:from-pink-100 hover:to-cyan-100 rounded-2xl text-left transition-colors border-2 border-transparent hover:border-pink-200"
-                    >
-                      <p className="font-bold text-gray-700 font-comic truncate">
-                        {savedStory.topic}
-                      </p>
-                      <p className="text-sm text-gray-500 font-lexend mt-1">
-                        Max {savedStory.maxLetters} letters •{" "}
-                        {new Date(savedStory.createdAt).toLocaleDateString()}
-                      </p>
-                      <p className="text-gray-600 font-lexend mt-2 line-clamp-2 text-sm">
-                        {savedStory.content.slice(0, 100)}...
-                      </p>
-                    </button>
-                  ))}
+                  {savedStories.map((savedStory) => {
+                    // Extract image model from the first image URL
+                    const imageModelId =
+                      savedStory.imageUrls && savedStory.imageUrls.length > 0
+                        ? extractImageModelFromUrl(savedStory.imageUrls[0])
+                        : null;
+                    const imageModelName =
+                      getImageModelDisplayName(imageModelId);
+
+                    return (
+                      <button
+                        key={savedStory.id}
+                        onClick={() => loadStory(savedStory)}
+                        className="w-full p-4 bg-gradient-to-r from-pink-50 to-cyan-50 hover:from-pink-100 hover:to-cyan-100 rounded-2xl text-left transition-colors border-2 border-transparent hover:border-pink-200"
+                      >
+                        <p className="font-bold text-gray-700 font-comic truncate">
+                          {savedStory.topic}
+                        </p>
+                        <p className="text-sm text-gray-500 font-lexend mt-1">
+                          Max {savedStory.maxLetters} letters •{" "}
+                          {new Date(savedStory.createdAt).toLocaleDateString()}
+                        </p>
+                        {imageModelId && (
+                          <p className="text-xs text-purple-600 font-lexend mt-1">
+                            🎨 {imageModelName}
+                          </p>
+                        )}
+                        <p className="text-gray-600 font-lexend mt-2 line-clamp-2 text-sm">
+                          {savedStory.content.slice(0, 100)}...
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <button
