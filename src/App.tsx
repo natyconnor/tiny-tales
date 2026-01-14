@@ -812,16 +812,13 @@ function App() {
                 }`}
               >
                 {exportItems.map((item, index) => (
-                  <div
-                    key={index}
-                    className="rounded-xl overflow-hidden border-2 border-yellow-300 shadow-md bg-white"
-                  >
-                    <div className="aspect-[4/3] bg-amber-50">
+                  <div key={index} className="bg-white">
+                    <div className="aspect-square bg-amber-50 border-2 border-yellow-300 rounded-t-xl overflow-hidden">
                       {item.dataUrl ? (
                         <img
                           src={item.dataUrl}
                           alt={`Story illustration ${index + 1}`}
-                          className="w-full h-full object-cover block"
+                          className="w-full h-full object-contain block bg-white"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-xs text-amber-600">
@@ -829,7 +826,7 @@ function App() {
                         </div>
                       )}
                     </div>
-                    <div className="px-3 py-2">
+                    <div className="border-2 border-t-0 border-yellow-300 rounded-b-xl px-3 py-2 min-h-[48px] flex items-center">
                       <p className="text-sm leading-relaxed text-gray-700">
                         {item.segment}
                       </p>
@@ -838,13 +835,6 @@ function App() {
                 ))}
               </div>
             )}
-
-            {/* Story Text Card */}
-            <div className="bg-white rounded-xl p-4 border-2 border-yellow-300 shadow-md">
-              <p className="text-lg leading-relaxed text-gray-800 font-lexend font-medium">
-                {story}
-              </p>
-            </div>
 
             {/* Footer */}
             <div className="text-center mt-4">
