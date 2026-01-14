@@ -53,9 +53,9 @@ const AVAILABLE_MODELS = [
 // Each story uses 4 images
 const IMAGE_MODELS = [
   {
-    id: "flux",
-    name: "Flux Schnell",
-    description: "Fast & free (unlimited)",
+    id: "gptimage",
+    name: "GPT Image",
+    description: "OpenAI (~17/day)",
   },
   {
     id: "nanobanana",
@@ -63,9 +63,9 @@ const IMAGE_MODELS = [
     description: "Best quality (~6/day)",
   },
   {
-    id: "gptimage",
-    name: "GPT Image",
-    description: "OpenAI (~17/day)",
+    id: "flux",
+    name: "Flux Schnell",
+    description: "Fast & free (unlimited)",
   },
   {
     id: "seedream",
@@ -105,7 +105,7 @@ function App() {
   const [topic, setTopic] = useState("");
   const [maxLetters, setMaxLetters] = useState(5);
   const [model, setModel] = useState("gemini-2.5-flash-lite");
-  const [imageModel, setImageModel] = useState("flux");
+  const [imageModel, setImageModel] = useState("gptimage");
   const [story, setStory] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [loadedImages, setLoadedImages] = useState<boolean[]>([]);
