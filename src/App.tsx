@@ -41,41 +41,92 @@ const AVAILABLE_MODELS = [
   },
 ];
 
-// Available Pollinations image models
+// Available Pollinations image models with pollen costs
 // See: https://gen.pollinations.ai/image/models
-// Cost per 1 pollen/day: flux=5K, turbo=3.3K, gptimage=70, seedream=35, nanobanana=25, nanobanana-pro=6
+// Pollen rates from API docs (images per 1 pollen / pollen per image):
+//   flux:          5000 images/pollen  = 0.0002 pollen/image
+//   zimage:        5000 images/pollen  = 0.0002 pollen/image
+//   turbo:         3300 images/pollen  = 0.0003 pollen/image
+//   gptimage:      70 images/pollen    = 0.0143 pollen/image
+//   seedream:      35 images/pollen    = 0.0286 pollen/image
+//   kontext:       25 images/pollen    = 0.04 pollen/image
+//   nanobanana:    25 images/pollen    = 0.04 pollen/image
+//   seedream-pro:  25 images/pollen    = 0.04 pollen/image
+//   gptimage-large:20 images/pollen    = 0.05 pollen/image
+//   nanobanana-pro:6 images/pollen     = 0.167 pollen/image
+// Each story uses 4 images, so stories/pollen = images_per_pollen / 4
 const IMAGE_MODELS = [
   {
     id: "flux",
     name: "Flux Schnell",
-    description: "Unlimited (default)",
+    baseDescription: "Fast & free",
+    pollenPerImage: 0.0002, // 5000 images/pollen
   },
   {
     id: "nanobanana",
     name: "Nano Banana ⭐",
-    description: "Best quality (~6 stories/day)",
+    baseDescription: "Best quality",
+    pollenPerImage: 0.04, // 25 images/pollen
   },
   {
     id: "gptimage",
     name: "GPT Image",
-    description: "OpenAI (~17 stories/day)",
+    baseDescription: "OpenAI quality",
+    pollenPerImage: 0.0143, // 70 images/pollen
   },
   {
     id: "seedream",
     name: "Seedream",
-    description: "ByteDance (~8 stories/day)",
+    baseDescription: "ByteDance",
+    pollenPerImage: 0.0286, // 35 images/pollen
   },
   {
     id: "turbo",
     name: "SDXL Turbo",
-    description: "Fastest, unlimited",
+    baseDescription: "Fastest",
+    pollenPerImage: 0.0003, // 3300 images/pollen
   },
   {
     id: "nanobanana-pro",
     name: "Nano Banana Pro",
-    description: "4K quality (~1 story/day)",
+    baseDescription: "4K quality",
+    pollenPerImage: 0.167, // 6 images/pollen
   },
 ];
+
+const IMAGES_PER_STORY = 4;
+
+// Calculate how many stories can be generated with current pollen balance
+const getStoriesRemaining = (
+  pollenBalance: number | null,
+  pollenPerImage: number
+): number | null => {
+  if (pollenBalance === null) return null;
+  const pollenPerStory = pollenPerImage * IMAGES_PER_STORY;
+  return Math.floor(pollenBalance / pollenPerStory);
+};
+
+// Format the description for a model based on pollen balance
+const getModelDescription = (
+  model: (typeof IMAGE_MODELS)[number],
+  pollenBalance: number | null
+): string => {
+  const storiesRemaining = getStoriesRemaining(
+    pollenBalance,
+    model.pollenPerImage
+  );
+
+  if (storiesRemaining === null) {
+    return model.baseDescription;
+  }
+
+  // For models with very high limits, show as "unlimited"
+  if (storiesRemaining > 1000) {
+    return `${model.baseDescription} (unlimited)`;
+  }
+
+  return `${model.baseDescription} (~${storiesRemaining} stories left)`;
+};
 
 // Helper function to extract image model from a Pollinations URL
 const extractImageModelFromUrl = (url: string): string | null => {
@@ -109,6 +160,7 @@ function App() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [storageWarning, setStorageWarning] = useState(false);
+  const [pollenBalance, setPollenBalance] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +180,24 @@ function App() {
       }
     }
   }, []);
+
+  // Fetch pollen balance (on mount and after story generation)
+  const fetchPollenBalance = useCallback(async () => {
+    try {
+      const response = await fetch("/api/pollen-balance");
+      const data = await response.json();
+      if (data.balance !== null && data.balance !== undefined) {
+        setPollenBalance(data.balance);
+      }
+    } catch (err) {
+      console.error("Failed to fetch pollen balance:", err);
+    }
+  }, []);
+
+  // Fetch balance on mount
+  useEffect(() => {
+    fetchPollenBalance();
+  }, [fetchPollenBalance]);
 
   // Save stories to localStorage
   const saveStory = useCallback((newStory: Story) => {
@@ -249,6 +319,18 @@ function App() {
       console.warn(`Could not capture image ${index + 1} for export:`, err);
     }
   };
+
+  // Refresh pollen balance when all images finish loading
+  useEffect(() => {
+    if (
+      imageUrls.length > 0 &&
+      loadedImages.length === imageUrls.length &&
+      loadedImages.every(Boolean)
+    ) {
+      // All images loaded, refresh the balance
+      fetchPollenBalance();
+    }
+  }, [loadedImages, imageUrls.length, fetchPollenBalance]);
 
   // Handle image load error
   const handleImageError = (index: number, url: string) => {
@@ -494,13 +576,10 @@ function App() {
               >
                 {IMAGE_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.name} — {m.description}
+                    {m.name} — {getModelDescription(m, pollenBalance)}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-400 mt-1 font-lexend">
-                Try different models for different illustration styles
-              </p>
             </div>
 
             {/* Generate Button */}

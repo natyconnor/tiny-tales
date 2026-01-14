@@ -29,14 +29,21 @@ const ALLOWED_MODELS = [
 
 // Allowed Pollinations image models
 // See: https://gen.pollinations.ai/image/models
-// Images per 1 pollen: flux=5K, turbo=3.3K, gptimage=70, seedream=35, nanobanana=25, nanobanana-pro=6
+// Pollen rates (images per 1 pollen / pollen per image):
+//   flux:          5000 images/pollen = 0.0002 pollen/image
+//   turbo:         3300 images/pollen = 0.0003 pollen/image
+//   gptimage:      70 images/pollen   = 0.0143 pollen/image
+//   seedream:      35 images/pollen   = 0.0286 pollen/image
+//   nanobanana:    25 images/pollen   = 0.04 pollen/image
+//   nanobanana-pro:6 images/pollen    = 0.167 pollen/image
+// Each story uses 4 images
 const ALLOWED_IMAGE_MODELS = [
-  "flux", // Flux Schnell - essentially unlimited
-  "nanobanana", // Gemini 2.5 Flash Image - ~6 stories/day
-  "gptimage", // OpenAI GPT Image 1 Mini - ~17 stories/day
-  "seedream", // ByteDance ARK - ~8 stories/day
-  "turbo", // SDXL Turbo - essentially unlimited
-  "nanobanana-pro", // Gemini 3 Pro Image - ~1 story/day (expensive!)
+  "flux", // Flux Schnell - 5K images/pollen (essentially unlimited)
+  "nanobanana", // NanoBanana - 25 images/pollen
+  "gptimage", // OpenAI GPT Image 1 Mini - 70 images/pollen
+  "seedream", // ByteDance Seedream 4.0 - 35 images/pollen
+  "turbo", // SDXL Turbo - 3.3K images/pollen (essentially unlimited)
+  "nanobanana-pro", // NanoBanana Pro - 6 images/pollen (expensive!)
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
