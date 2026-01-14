@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type SyntheticEvent,
+} from "react";
 import html2canvas from "html2canvas";
 import {
   Sparkles,
@@ -227,7 +233,7 @@ function App() {
   // Handle image load completion - also capture as data URL for export
   const handleImageLoad = (
     index: number,
-    event: React.SyntheticEvent<HTMLImageElement>
+    event: SyntheticEvent<HTMLImageElement>
   ) => {
     console.log(`Image ${index + 1} loaded successfully`);
     setLoadedImages((prev) => {
@@ -374,6 +380,15 @@ function App() {
     "DOLPHIN",
     "ELEPHANT",
   ];
+
+  const exportSegments = splitStoryIntoSegments(
+    story,
+    Math.max(imageUrls.length, 1)
+  );
+  const exportItems = imageUrls.map((_, index) => ({
+    dataUrl: imageDataUrls[index],
+    segment: exportSegments[index] || "",
+  }));
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -790,29 +805,37 @@ function App() {
             </div>
 
             {/* Images Grid - uses captured data URLs from already-loaded images */}
-            {imageDataUrls.filter(Boolean).length > 0 && (
+            {exportItems.length > 0 && (
               <div
-                className={`grid gap-2 mb-4 ${
-                  imageDataUrls.filter(Boolean).length === 1
-                    ? "grid-cols-1"
-                    : "grid-cols-2"
+                className={`grid gap-3 mb-4 ${
+                  exportItems.length === 1 ? "grid-cols-1" : "grid-cols-2"
                 }`}
               >
-                {imageDataUrls.map(
-                  (dataUrl, index) =>
-                    dataUrl && (
-                      <div
-                        key={index}
-                        className="rounded-xl overflow-hidden border-2 border-yellow-300 shadow-md bg-white"
-                      >
+                {exportItems.map((item, index) => (
+                  <div
+                    key={index}
+                    className="rounded-xl overflow-hidden border-2 border-yellow-300 shadow-md bg-white"
+                  >
+                    <div className="aspect-[4/3] bg-amber-50">
+                      {item.dataUrl ? (
                         <img
-                          src={dataUrl}
+                          src={item.dataUrl}
                           alt={`Story illustration ${index + 1}`}
-                          className="w-full h-36 object-cover block"
+                          className="w-full h-full object-cover block"
                         />
-                      </div>
-                    )
-                )}
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xs text-amber-600">
+                          Image unavailable
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-3 py-2">
+                      <p className="text-sm leading-relaxed text-gray-700">
+                        {item.segment}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
