@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import { motion } from "motion/react";
 import { History, Sparkles, Wand2 } from "lucide-react";
 
 import {
@@ -39,9 +40,19 @@ export default function StoryForm({
   onToggleHistory,
 }: StoryFormProps) {
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 md:p-8 border-4 border-dashed border-pink-200 no-print">
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 md:p-8 border-4 border-dashed border-pink-200 no-print"
+    >
       {/* Topic Input */}
-      <div className="mb-6">
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+        className="mb-6"
+      >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
           🌟 What should the story be about?
         </label>
@@ -51,14 +62,19 @@ export default function StoryForm({
           value={topic}
           onChange={(event) => onTopicChange(event.target.value)}
           placeholder="A brave cat, magical forest, funny robot..."
-          className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm"
+          className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm"
           disabled={isLoading}
           onKeyDown={(event) => event.key === "Enter" && onGenerate()}
         />
-      </div>
+      </motion.div>
 
       {/* Max Letters Slider */}
-      <div className="mb-6">
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+        className="mb-6"
+      >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
           📏 Maximum letters per word:{" "}
           <span className="text-pink-500">{maxLetters}</span>
@@ -70,7 +86,7 @@ export default function StoryForm({
             max="8"
             value={maxLetters}
             onChange={(event) => onMaxLettersChange(Number(event.target.value))}
-            className="w-full h-3 bg-gradient-to-r from-green-300 via-cyan-300 to-purple-300 rounded-full appearance-none cursor-pointer slider-thumb"
+            className="w-full h-3 bg-gradient-to-r from-pink-300 via-fuchsia-300 to-purple-300 rounded-full appearance-none cursor-pointer slider-thumb"
             disabled={isLoading}
             style={{
               WebkitAppearance: "none",
@@ -81,7 +97,7 @@ export default function StoryForm({
               -webkit-appearance: none;
               width: 28px;
               height: 28px;
-              background: linear-gradient(135deg, #FF6B9D, #4ECDC4);
+              background: linear-gradient(135deg, #f472b6, #a855f7);
               border-radius: 50%;
               cursor: pointer;
               box-shadow: 0 4px 10px rgba(0,0,0,0.2);
@@ -90,7 +106,7 @@ export default function StoryForm({
             input[type='range']::-moz-range-thumb {
               width: 28px;
               height: 28px;
-              background: linear-gradient(135deg, #FF6B9D, #4ECDC4);
+              background: linear-gradient(135deg, #f472b6, #a855f7);
               border-radius: 50%;
               cursor: pointer;
               box-shadow: 0 4px 10px rgba(0,0,0,0.2);
@@ -105,10 +121,15 @@ export default function StoryForm({
             <span>8</span>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Model Selector */}
-      <div className="mb-6">
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+        className="mb-6"
+      >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
           🤖 Story AI
         </label>
@@ -116,7 +137,7 @@ export default function StoryForm({
           value={model}
           onChange={(event) => onModelChange(event.target.value)}
           disabled={isLoading}
-          className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
+          className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
           {AVAILABLE_MODELS.map((item) => (
             <option key={item.id} value={item.id}>
@@ -124,10 +145,15 @@ export default function StoryForm({
             </option>
           ))}
         </select>
-      </div>
+      </motion.div>
 
       {/* Image Model Selector */}
-      <div className="mb-8">
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.4, duration: 0.4 }}
+        className="mb-8"
+      >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
           🎨 Image AI
         </label>
@@ -135,7 +161,7 @@ export default function StoryForm({
           value={imageModel}
           onChange={(event) => onImageModelChange(event.target.value)}
           disabled={isLoading}
-          className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
+          className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-fuchsia-500 focus:ring-4 focus:ring-fuchsia-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
           {IMAGE_MODELS.map((item) => (
             <option key={item.id} value={item.id}>
@@ -143,13 +169,18 @@ export default function StoryForm({
             </option>
           ))}
         </select>
-      </div>
+      </motion.div>
 
       {/* Generate Button */}
-      <button
+      <motion.button
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.5, duration: 0.4 }}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
         onClick={onGenerate}
         disabled={isLoading || !topic.trim()}
-        className="w-full py-4 px-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 font-comic"
+        className="w-full py-4 px-6 bg-gradient-to-r from-pink-400 via-fuchsia-500 to-purple-500 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-comic"
       >
         {isLoading ? (
           <>
@@ -167,18 +198,23 @@ export default function StoryForm({
             <Sparkles className="w-6 h-6" />
           </>
         )}
-      </button>
+      </motion.button>
 
       {/* History Button */}
       {savedStoriesCount > 0 && (
-        <button
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.4 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={onToggleHistory}
-          className="mt-4 w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl flex items-center justify-center gap-2 transition-colors font-lexend"
+          className="mt-4 w-full py-2 px-4 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center gap-2 transition-colors font-lexend"
         >
           <History className="w-5 h-5" />
           <span>My Story History ({savedStoriesCount})</span>
-        </button>
+        </motion.button>
       )}
-    </div>
+    </motion.div>
   );
 }

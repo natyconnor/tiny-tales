@@ -5,6 +5,7 @@ import {
   useRef,
   type SyntheticEvent,
 } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Wand2 } from "lucide-react";
 import AppHeader from "./components/AppHeader";
 import ExportPrintContainer from "./components/ExportPrintContainer";
@@ -282,6 +283,7 @@ function App() {
       <div className="container mx-auto px-4 py-8 relative z-10">
         <AppHeader />
 
+        {/* Form section - narrower width */}
         <div className="max-w-2xl mx-auto">
           <StoryForm
             topic={topic}
@@ -299,56 +301,90 @@ function App() {
             onToggleHistory={() => setShowHistory((prev) => !prev)}
           />
 
-          {error && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-center">
-              <p className="text-red-600 font-medium font-lexend">{error}</p>
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-center"
+              >
+                <p className="text-red-600 font-medium font-lexend">{error}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {storageWarning && (
-            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center">
-              <p className="text-amber-700 font-medium font-lexend">
-                ⚠️ Story saved! Your oldest story was removed to make room.
-              </p>
-              <p className="text-xs text-amber-600 font-lexend mt-1">
-                (You can keep up to {MAX_STORED_STORIES} stories in your
-                history)
-              </p>
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {storageWarning && (
+              <motion.div
+                key="warning"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center"
+              >
+                <p className="text-amber-700 font-medium font-lexend">
+                  ⚠️ Story saved! Your oldest story was removed to make room.
+                </p>
+                <p className="text-xs text-amber-600 font-lexend mt-1">
+                  (You can keep up to {MAX_STORED_STORIES} stories in your
+                  history)
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {isLoading && (
-            <div className="mt-8 text-center">
-              <div className="inline-flex items-center gap-4 p-6 bg-white/80 rounded-3xl shadow-lg">
-                <div className="relative">
-                  <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
-                  <Wand2 className="w-8 h-8 text-purple-500 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+          <AnimatePresence mode="wait">
+            {isLoading && (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.3 }}
+                className="mt-8 text-center"
+              >
+                <div className="inline-flex items-center gap-4 p-6 bg-white/80 rounded-3xl shadow-lg border-2 border-pink-200">
+                  <div className="relative">
+                    <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
+                    <Wand2 className="w-8 h-8 text-purple-500 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xl font-bold text-gray-700 font-comic">
+                      Crafting your story...
+                    </p>
+                    <p className="text-gray-500 font-lexend">
+                      Our wizard is writing something special! ✨
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-xl font-bold text-gray-700 font-comic">
-                    Crafting your story...
-                  </p>
-                  <p className="text-gray-500 font-lexend">
-                    Our wizard is writing something special! ✨
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
-          {story && !isLoading && (
-            <StoryDisplay
-              story={story}
-              imageUrls={imageUrls}
-              loadedImages={loadedImages}
-              isGeneratingImage={isGeneratingImage}
-              onImageLoad={handleImageLoad}
-              onImageError={handleImageError}
-              onDownloadImage={downloadAsImage}
-              onGenerateAnother={generateStory}
-            />
-          )}
+        {/* Story section - wider width for 2-column layout */}
+        <div className="max-w-4xl mx-auto">
+          <AnimatePresence mode="wait">
+            {story && !isLoading && (
+              <StoryDisplay
+                story={story}
+                imageUrls={imageUrls}
+                loadedImages={loadedImages}
+                isGeneratingImage={isGeneratingImage}
+                onImageLoad={handleImageLoad}
+                onImageError={handleImageError}
+                onDownloadImage={downloadAsImage}
+                onGenerateAnother={generateStory}
+              />
+            )}
+          </AnimatePresence>
+        </div>
 
+        <AnimatePresence>
           {showHistory && (
             <HistoryModal
               savedStories={savedStories}
@@ -357,7 +393,9 @@ function App() {
               onClearHistory={clearHistory}
             />
           )}
+        </AnimatePresence>
 
+        <AnimatePresence>
           {showExportModal && exportPreviewUrl && (
             <ExportPreviewModal
               previewUrl={exportPreviewUrl}
@@ -365,7 +403,7 @@ function App() {
               onClose={() => setShowExportModal(false)}
             />
           )}
-        </div>
+        </AnimatePresence>
 
         <ExportPrintContainer
           topic={topic}
@@ -373,9 +411,14 @@ function App() {
           printContainerRef={printContainerRef}
         />
 
-        <footer className="text-center mt-12 text-gray-500 font-lexend no-print">
+        <motion.footer
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="text-center mt-12 text-gray-500 font-lexend no-print"
+        >
           <p>Made with ❤️ for little readers everywhere</p>
-        </footer>
+        </motion.footer>
       </div>
     </div>
   );

@@ -3,17 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --color-sunshine: #FFE066;
-  --color-sky: #87CEEB;
-  --color-grass: #90EE90;
-  --color-berry: #FF6B9D;
-  --color-ocean: #4ECDC4;
-  --color-lavender: #B19CD9;
+  /* Unified pink-to-purple palette */
+  --color-primary-start: #f472b6; /* pink-400 */
+  --color-primary-end: #a855f7; /* purple-500 */
+  --color-accent-start: #ec4899; /* pink-500 */
+  --color-accent-end: #8b5cf6; /* violet-500 */
+  --color-bg-start: #fdf2f8; /* pink-50 */
+  --color-bg-mid: #faf5ff; /* purple-50 */
+  --color-bg-end: #f5f3ff; /* violet-50 */
 }
 
 body {
   font-family: 'Lexend', sans-serif;
-  background: linear-gradient(135deg, #FFF5E6 0%, #E6F3FF 50%, #F0FFF0 100%);
+  background: linear-gradient(135deg, var(--color-bg-start) 0%, var(--color-bg-mid) 50%, var(--color-bg-end) 100%);
   min-height: 100vh;
 }
 
@@ -28,12 +30,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #FFB6C1, #87CEEB);
+  background: linear-gradient(180deg, var(--color-primary-start), var(--color-primary-end));
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #FF69B4, #4169E1);
+  background: linear-gradient(180deg, #ec4899, #9333ea);
 }
 
 /* Hide scrollbar utility */
@@ -51,9 +53,9 @@ body {
 }
 
 .story-word:hover {
-  background: linear-gradient(135deg, #FFE066 0%, #FF6B9D 100%);
+  background: linear-gradient(135deg, var(--color-accent-start) 0%, var(--color-primary-end) 100%);
   transform: scale(1.1);
-  color: #333;
+  color: white;
 }
 
 /* Loading dots animation */
@@ -82,8 +84,8 @@ body {
 .rainbow-text {
   background: linear-gradient(
     135deg,
-    #6366f1 0%,
-    #8b5cf6 50%,
+    #ec4899 0%,
+    #d946ef 40%,
     #a855f7 100%
   );
   -webkit-background-clip: text;
@@ -95,21 +97,7 @@ body {
 .floating-shape {
   position: absolute;
   opacity: 0.3;
-  animation: float 6s ease-in-out infinite;
   pointer-events: none;
-}
-
-.floating-shape:nth-child(odd) {
-  animation-delay: -3s;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-20px) rotate(10deg);
-  }
 }
 
 /* Print styles */
@@ -135,7 +123,7 @@ body {
 
   .story-container {
     box-shadow: none !important;
-    border: 3px solid #FFD700 !important;
+    border: 3px solid #a855f7 !important;
     border-radius: 16px !important;
     padding: 24px !important;
     margin: 0 !important;
