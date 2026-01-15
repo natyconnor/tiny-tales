@@ -20,12 +20,29 @@ interface RequestBody {
   imageModel?: string;
 }
 
-// Allowed text models (to prevent arbitrary model injection)
+// Pollinations text models (OpenAI-compatible endpoint)
+// See: https://gen.pollinations.ai/v1/models
 const ALLOWED_MODELS = [
+  "gemini-fast", // Gemini 2.5 Flash Lite - fastest
+  "deepseek", // DeepSeek V3.2 - best reasoning
+  "openai", // GPT-5 Mini - balanced
+  "gemini", // Gemini 3 Flash - newest
+];
+
+// Gemini fallback models (when USE_GEMINI_FALLBACK is set)
+const GEMINI_FALLBACK_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
   "gemini-3-flash-preview",
 ];
+
+// Map Pollinations model IDs to Gemini model IDs for fallback
+const POLLINATIONS_TO_GEMINI_MAP: Record<string, string> = {
+  "gemini-fast": "gemini-2.5-flash-lite",
+  deepseek: "gemini-2.5-flash",
+  openai: "gemini-2.5-flash",
+  gemini: "gemini-3-flash-preview",
+};
 
 // Allowed Pollinations image models
 // See: https://gen.pollinations.ai/image/models
@@ -58,15 +75,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Get API key from environment
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    log("ERROR: GEMINI_API_KEY is not set");
+  // Check if we should use Gemini fallback
+  const useGeminiFallback = process.env.USE_GEMINI_FALLBACK === "true";
+  log(
+    `Using ${useGeminiFallback ? "Gemini fallback" : "Pollinations"} for text`
+  );
+
+  // Get appropriate API key
+  const pollinationsKey = process.env.POLLINATIONS_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  if (useGeminiFallback && !geminiKey) {
+    log("ERROR: GEMINI_API_KEY is not set for fallback mode");
     return res.status(500).json({
-      error: "Server configuration error: API key not set",
+      error: "Server configuration error: Gemini API key not set",
     });
   }
-  log(`API key found: ${apiKey.slice(0, 8)}...`);
+
+  if (pollinationsKey) {
+    log(`Pollinations key found: ${pollinationsKey.slice(0, 8)}...`);
+  }
+  if (geminiKey) {
+    log(`Gemini key found: ${geminiKey.slice(0, 8)}...`);
+  }
 
   try {
     // In Node.js serverless, body is already parsed
@@ -92,11 +123,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .json({ error: "Maximum letters must be between 3 and 8" });
     }
 
-    // Use requested model if valid, otherwise default to fastest model
-    const modelName =
-      requestedModel && ALLOWED_MODELS.includes(requestedModel)
-        ? requestedModel
-        : "gemini-2.5-flash-lite";
+    // Determine which model to use
+    let modelName: string;
+    if (useGeminiFallback) {
+      // Map Pollinations model to Gemini equivalent, or use directly if it's a Gemini model
+      const mappedModel = POLLINATIONS_TO_GEMINI_MAP[requestedModel ?? ""];
+      modelName =
+        mappedModel ||
+        (requestedModel && GEMINI_FALLBACK_MODELS.includes(requestedModel)
+          ? requestedModel
+          : "gemini-2.5-flash-lite");
+    } else {
+      // Use Pollinations model directly
+      modelName =
+        requestedModel && ALLOWED_MODELS.includes(requestedModel)
+          ? requestedModel
+          : "gemini-fast";
+    }
     log(`Using text model: ${modelName}`);
 
     // Use requested image model if valid, otherwise default to flux
@@ -105,10 +148,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? requestedImageModel
         : "flux";
     log(`Using image model: ${imageModelName}`);
-
-    // Initialize Gemini
-    const ai = new GoogleGenAI({ apiKey });
-    log("Gemini client initialized");
 
     // Create the prompt - requesting JSON with story + character descriptions + image prompts
     const prompt = `Create a simple, fun children's story about "${topic}" with detailed character descriptions and 4 illustration prompts.
@@ -168,14 +207,60 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 }`;
 
     // Generate the story and image prompts
-    log("Calling Gemini API...");
-    const result = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-    });
-    log("Gemini API responded");
+    let responseText: string;
 
-    const responseText = result.text?.trim() ?? "";
+    if (useGeminiFallback) {
+      // Use Gemini API directly
+      log("Calling Gemini API...");
+      const ai = new GoogleGenAI({ apiKey: geminiKey! });
+      const result = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+      });
+      log("Gemini API responded");
+      responseText = result.text?.trim() ?? "";
+    } else {
+      // Use Pollinations OpenAI-compatible API
+      log("Calling Pollinations API...");
+      const pollinationsResponse = await fetch(
+        "https://gen.pollinations.ai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(pollinationsKey && {
+              Authorization: `Bearer ${pollinationsKey}`,
+            }),
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!pollinationsResponse.ok) {
+        const errorText = await pollinationsResponse.text();
+        log(
+          `Pollinations API error: ${pollinationsResponse.status} - ${errorText}`
+        );
+        throw new Error(
+          `Pollinations API error: ${pollinationsResponse.status}`
+        );
+      }
+
+      const pollinationsData = (await pollinationsResponse.json()) as {
+        choices: Array<{ message: { content: string } }>;
+      };
+      log("Pollinations API responded");
+      responseText =
+        pollinationsData.choices?.[0]?.message?.content?.trim() ?? "";
+    }
     log(`Response received: ${responseText.length} chars`);
 
     // Parse the JSON response
@@ -247,7 +332,8 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
         time: Date.now() - startTime,
         model: modelName,
         imageModel: imageModelName,
-        pollinationsKeyConfigured: !!process.env.POLLINATIONS_API_KEY,
+        textApi: useGeminiFallback ? "gemini" : "pollinations",
+        pollinationsKeyConfigured: !!pollinationsKey,
       },
     });
   } catch (error) {

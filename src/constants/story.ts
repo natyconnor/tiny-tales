@@ -1,21 +1,29 @@
 export const STORAGE_KEY = "tiny-tales-stories";
 export const MAX_STORED_STORIES = 50;
 
+// Available Pollinations text models
+// See: https://gen.pollinations.ai/v1/models
+// Using OpenAI-compatible endpoint at /v1/chat/completions
 export const AVAILABLE_MODELS = [
   {
-    id: "gemini-2.5-flash-lite",
+    id: "gemini-fast",
     name: "Gemini 2.5 Flash Lite",
     description: "Fastest ⚡ (recommended)",
   },
   {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    description: "More capable, slower",
+    id: "deepseek",
+    name: "DeepSeek V3.2",
+    description: "Best reasoning 🧠",
   },
   {
-    id: "gemini-3-flash-preview",
-    name: "Gemini 3 Flash Preview",
-    description: "Newest (beta)",
+    id: "openai",
+    name: "GPT-5 Mini",
+    description: "Balanced quality",
+  },
+  {
+    id: "gemini",
+    name: "Gemini 3 Flash",
+    description: "Newest & capable",
   },
 ];
 
