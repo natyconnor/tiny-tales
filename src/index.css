@@ -58,6 +58,23 @@ body {
   color: white;
 }
 
+/* Reading mode word hover effect - larger and more pronounced */
+.reading-mode-word {
+  display: inline-block;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: default;
+  padding: 4px 8px;
+  margin: 2px;
+  border-radius: 8px;
+}
+
+.reading-mode-word:hover {
+  background: linear-gradient(135deg, var(--color-accent-start) 0%, var(--color-primary-end) 100%);
+  transform: scale(1.15);
+  color: white;
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
+}
+
 /* Loading dots animation */
 .loading-dot {
   animation: loadingDot 1.4s ease-in-out infinite both;

@@ -12,6 +12,7 @@ import ExportPrintContainer from "./components/ExportPrintContainer";
 import ExportPreviewModal from "./components/ExportPreviewModal";
 import FloatingShapes from "./components/FloatingShapes";
 import HistoryModal from "./components/HistoryModal";
+import ReadingModeModal from "./components/ReadingModeModal";
 import StoryDisplay from "./components/StoryDisplay";
 import StoryForm from "./components/StoryForm";
 import { MAX_STORED_STORIES, STORAGE_KEY } from "./constants/story";
@@ -40,6 +41,8 @@ function App() {
   const [storageWarning, setStorageWarning] = useState(false);
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showReadingMode, setShowReadingMode] = useState(false);
+  const [readingModeIndex, setReadingModeIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
 
@@ -259,6 +262,11 @@ function App() {
     }
   };
 
+  const openReadingMode = () => {
+    setReadingModeIndex(0);
+    setShowReadingMode(true);
+  };
+
   const exportSegments = splitStoryIntoSegments(
     story,
     Math.max(imageUrls.length, 1)
@@ -379,6 +387,7 @@ function App() {
                 onImageError={handleImageError}
                 onDownloadImage={downloadAsImage}
                 onGenerateAnother={generateStory}
+                onOpenReadingMode={openReadingMode}
               />
             )}
           </AnimatePresence>
@@ -401,6 +410,18 @@ function App() {
               previewUrl={exportPreviewUrl}
               fileName={exportFileName}
               onClose={() => setShowExportModal(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showReadingMode && imageUrls.length > 0 && (
+            <ReadingModeModal
+              imageUrls={imageUrls}
+              segments={exportSegments}
+              currentIndex={readingModeIndex}
+              onIndexChange={setReadingModeIndex}
+              onClose={() => setShowReadingMode(false)}
             />
           )}
         </AnimatePresence>

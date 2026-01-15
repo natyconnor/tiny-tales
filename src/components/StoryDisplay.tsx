@@ -1,6 +1,6 @@
 import type { SyntheticEvent } from "react";
 import { motion } from "motion/react";
-import { Download, RotateCcw } from "lucide-react";
+import { Download, RotateCcw, BookOpen } from "lucide-react";
 
 import { splitStoryIntoSegments } from "../utils/storySegments";
 
@@ -13,6 +13,7 @@ type StoryDisplayProps = {
   onImageError: (index: number, url: string) => void;
   onDownloadImage: () => void;
   onGenerateAnother: () => void;
+  onOpenReadingMode: () => void;
 };
 
 const renderStory = (text: string) => {
@@ -37,6 +38,7 @@ export default function StoryDisplay({
   onImageError,
   onDownloadImage,
   onGenerateAnother,
+  onOpenReadingMode,
 }: StoryDisplayProps) {
   const segments = splitStoryIntoSegments(
     story,
@@ -74,20 +76,33 @@ export default function StoryDisplay({
         <h2 className="text-2xl font-bold text-gray-700 font-comic flex items-center gap-2">
           <span>📖</span> Your Story
         </h2>
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={onDownloadImage}
-          disabled={isGeneratingImage}
-          className="p-2 bg-pink-100 hover:bg-pink-200 rounded-full transition-colors disabled:opacity-50"
-          title="Download as image"
-        >
-          {isGeneratingImage ? (
-            <div className="w-5 h-5 border-2 border-pink-300 border-t-pink-600 rounded-full animate-spin" />
-          ) : (
-            <Download className="w-5 h-5 text-pink-600" />
+        <div className="flex items-center gap-2">
+          {imageUrls.length > 0 && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onOpenReadingMode}
+              className="p-2 bg-purple-100 hover:bg-purple-200 rounded-full transition-colors"
+              title="Reading Mode"
+            >
+              <BookOpen className="w-5 h-5 text-purple-600" />
+            </motion.button>
           )}
-        </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={onDownloadImage}
+            disabled={isGeneratingImage}
+            className="p-2 bg-pink-100 hover:bg-pink-200 rounded-full transition-colors disabled:opacity-50"
+            title="Download as image"
+          >
+            {isGeneratingImage ? (
+              <div className="w-5 h-5 border-2 border-pink-300 border-t-pink-600 rounded-full animate-spin" />
+            ) : (
+              <Download className="w-5 h-5 text-pink-600" />
+            )}
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* Storybook Layout - 2-column responsive grid */}
