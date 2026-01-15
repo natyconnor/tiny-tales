@@ -149,20 +149,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : "flux";
     log(`Using image model: ${imageModelName}`);
 
+    // Get skill-level-specific guidance
+    const skillGuidance = getSkillLevelGuidance(maxLetters);
+
     // Create the prompt - requesting JSON with story + character descriptions + image prompts
     const prompt = `Create a simple, fun children's story about "${topic}" with detailed character descriptions and 4 illustration prompts.
 
 === PART 1: STORY TEXT ===
-Write a story for early readers (ages 4-7) where ALL words are ${maxLetters} letters or fewer.
+Write a story for early readers where ALL words are ${maxLetters} letters or fewer.
 
-STORY RULES:
-1. ALL words MUST be ${maxLetters} letters or fewer - NO EXCEPTIONS!
-2. Exactly 5-8 short, simple sentences (fragments are okay when the letter limit is low)
-3. Make it engaging, fun, and age-appropriate
-4. End with a positive or happy conclusion
-5. The longer the words, the more complex the story can be (more articles and such)
+SKILL LEVEL: ${skillGuidance.complexity}
 
-Examples of ${maxLetters}-letter words: ${getExampleWords(maxLetters)}
+STORY STRUCTURE:
+- Sentence length: ${skillGuidance.sentenceLength}
+- Total sentences: ${skillGuidance.sentenceCount}
+
+CRITICAL GRAMMAR RULES:
+${skillGuidance.grammarNotes}
+
+WORD LIMIT:
+- ALL words MUST be ${maxLetters} letters or fewer - NO EXCEPTIONS!
+- Count carefully: "beautiful" = 9 letters (NOT allowed if limit is 8)
+- Examples of ${maxLetters}-letter words: ${getExampleWords(maxLetters)}
+
+SENTENCE EXAMPLES FOR THIS SKILL LEVEL:
+${skillGuidance.exampleSentences}
+
+STORY REQUIREMENTS:
+1. Make it engaging, fun, and age-appropriate
+2. End with a positive or happy conclusion
+3. Each sentence should be its own clear thought
+4. Read your story aloud mentally - it should sound natural, not choppy
 
 === PART 2: CHARACTER DESCRIPTIONS ===
 For EACH character or important object in your story, provide a detailed visual description.
@@ -422,6 +439,116 @@ function getExampleWords(maxLetters: number): string {
   };
 
   return (examples[maxLetters] || examples[5]).join(", ");
+}
+
+/**
+ * Returns skill-level-specific writing guidance based on word length
+ * This adapts the story complexity to match the reader's ability
+ */
+function getSkillLevelGuidance(maxLetters: number): {
+  sentenceLength: string;
+  sentenceCount: string;
+  grammarNotes: string;
+  exampleSentences: string;
+  complexity: string;
+} {
+  switch (maxLetters) {
+    case 3:
+      return {
+        sentenceLength: "2-4 words per sentence",
+        sentenceCount: "4-6 very short sentences total",
+        grammarNotes: `CRITICAL: Always include small articles and words like "a", "the", "is", "it", "to", "in", "on", "up" - these are all ${maxLetters} letters or fewer and make sentences readable! Don't skip articles to save space. Fragments like "Big sun!" or "A red cat." are perfect.`,
+        exampleSentences: `
+GOOD examples for 3-letter limit:
+- "A cat ran."
+- "The dog is big."
+- "It was fun!"
+- "I see a red bug."
+
+BAD examples (sentences too long or missing articles):
+- "Cat ran to the big red sun and had fun" (too many words in one sentence)
+- "Cat ran." (missing "The" or "A" - sounds unnatural)`,
+        complexity:
+          "Beginner reader level. Ultra-simple. Think single actions, basic observations.",
+      };
+
+    case 4:
+      return {
+        sentenceLength: "3-5 words per sentence",
+        sentenceCount: "5-7 short sentences total",
+        grammarNotes: `Include all articles (a, an, the) and common small words (is, are, was, were, has, have, this, that, with). These make sentences flow naturally. Short complete sentences are better than fragments.`,
+        exampleSentences: `
+GOOD examples for 4-letter limit:
+- "The bird sang a song."
+- "A bear ate fish."
+- "They play in the rain."
+- "It was a warm day."
+
+BAD examples:
+- "Bird sang song." (missing articles - sounds choppy)
+- "The bird sang a beautiful song in the morning" (too long)`,
+        complexity:
+          "Early reader level. Simple complete sentences with basic narrative.",
+      };
+
+    case 5:
+      return {
+        sentenceLength: "4-7 words per sentence",
+        sentenceCount: "5-8 sentences total",
+        grammarNotes: `Write proper, complete sentences with good grammar. Include articles, conjunctions (and, but, so), and descriptive words. Sentences should feel natural when read aloud.`,
+        exampleSentences: `
+GOOD examples for 5-letter limit:
+- "The happy bunny found a shiny shell."
+- "She ran fast and won the race."
+- "The small bird sang a sweet song."
+- "It was a warm and sunny day."`,
+        complexity:
+          "Developing reader level. More descriptive language and simple story arcs.",
+      };
+
+    case 6:
+      return {
+        sentenceLength: "5-9 words per sentence",
+        sentenceCount: "6-8 sentences total",
+        grammarNotes: `Write fuller sentences with proper grammar, varied sentence structure, and descriptive language. Include dialogue if it fits naturally. Use conjunctions to connect ideas.`,
+        exampleSentences: `
+GOOD examples for 6-letter limit:
+- "The gentle rabbit hopped across the grassy garden."
+- "She smiled bright and waved to her friend."
+- "The purple flower danced in the gentle breeze."`,
+        complexity:
+          "Confident reader level. Richer vocabulary, more detailed scenes, character emotions.",
+      };
+
+    case 7:
+      return {
+        sentenceLength: "6-10 words per sentence",
+        sentenceCount: "6-10 sentences total",
+        grammarNotes: `Write complete, grammatically rich sentences. Use varied sentence lengths for rhythm. Include descriptive adjectives, dialogue, and character thoughts/feelings.`,
+        exampleSentences: `
+GOOD examples for 7-letter limit:
+- "The curious kitten sparkled with delight at the rainbow."
+- "Morning sunbeam danced through the magical flutter of puddles."
+- "She whispered a secret and started her amazing journey."`,
+        complexity:
+          "Advanced early reader. Complex narratives, character development, vivid imagery.",
+      };
+
+    case 8:
+    default:
+      return {
+        sentenceLength: "6-12 words per sentence",
+        sentenceCount: "6-10 sentences total",
+        grammarNotes: `Write polished, complete sentences with sophisticated structure. Use rich vocabulary, varied sentence patterns, dialogue, and emotional depth. The story should feel like a real children's book.`,
+        exampleSentences: `
+GOOD examples for 8-letter limit:
+- "The cheerful elephant trumpeted with colorful laughter and grateful joy."
+- "She followed the peaceful treasure map to discover a friendly surprise."
+- "The adorable sunshine made everyone feel grateful and peaceful."`,
+        complexity:
+          "Fluent early reader. Full narrative with beginning, middle, end. Rich description and character arcs.",
+      };
+  }
 }
 
 /**
