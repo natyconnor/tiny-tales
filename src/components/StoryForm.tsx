@@ -1,11 +1,12 @@
-import type { RefObject } from "react";
-import { motion } from "motion/react";
-import { History, Sparkles, Wand2 } from "lucide-react";
+import { type RefObject, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { History, Sparkles, Wand2, Lightbulb } from "lucide-react";
 
 import {
   AVAILABLE_MODELS,
   IMAGE_MODELS,
   LETTER_LABELS,
+  PROMPT_IDEAS,
 } from "../constants/story";
 
 type StoryFormProps = {
@@ -39,6 +40,26 @@ export default function StoryForm({
   onGenerate,
   onToggleHistory,
 }: StoryFormProps) {
+  const [showHints, setShowHints] = useState(false);
+  const [hintTimeout, setHintTimeout] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const promptData = PROMPT_IDEAS[maxLetters] || PROMPT_IDEAS[5];
+
+  // Delayed close to allow mouse to move from button to popover
+  const handleMouseLeave = () => {
+    const timeout = setTimeout(() => setShowHints(false), 150);
+    setHintTimeout(timeout);
+  };
+
+  const handleMouseEnter = () => {
+    if (hintTimeout) {
+      clearTimeout(hintTimeout);
+      setHintTimeout(null);
+    }
+    setShowHints(true);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -53,9 +74,68 @@ export default function StoryForm({
         transition={{ delay: 0.1, duration: 0.4 }}
         className="mb-6"
       >
-        <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
-          🌟 What should the story be about?
-        </label>
+        <div className="flex items-center gap-2 mb-2">
+          <label className="block text-lg font-bold text-gray-700 font-comic">
+            🌟 What should the story be about?
+          </label>
+          {/* Hint Icon */}
+          <div className="relative">
+            <button
+              type="button"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              onFocus={handleMouseEnter}
+              onBlur={handleMouseLeave}
+              className="p-1.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-600 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300"
+              aria-label="Show prompt ideas"
+            >
+              <Lightbulb className="w-4 h-4" />
+            </button>
+
+            {/* Hints Popover */}
+            <AnimatePresence>
+              {showHints && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-0 top-full mt-1 z-50 w-72 md:w-80"
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <div className="bg-white rounded-2xl shadow-xl border-2 border-amber-200 p-4 font-lexend">
+                    <div className="flex items-center gap-2 mb-3 text-amber-700 font-bold">
+                      <span className="text-xl">{promptData.emoji}</span>
+                      <span className="text-sm">
+                        Ideas for {maxLetters}-letter stories
+                      </span>
+                    </div>
+                    <ul className="space-y-2">
+                      {promptData.ideas.map((idea, index) => (
+                        <li key={index}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onTopicChange(idea);
+                              setShowHints(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors"
+                          >
+                            {idea}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-gray-400 mt-3 text-center">
+                      Click an idea or type your own!
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
         <input
           ref={inputRef}
           type="text"

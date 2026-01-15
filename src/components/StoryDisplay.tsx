@@ -40,10 +40,7 @@ export default function StoryDisplay({
   onGenerateAnother,
   onOpenReadingMode,
 }: StoryDisplayProps) {
-  const segments = splitStoryIntoSegments(
-    story,
-    Math.max(imageUrls.length, 1)
-  );
+  const segments = splitStoryIntoSegments(story, Math.max(imageUrls.length, 1));
 
   // Unified pink-to-purple color palette for story cards
   const bgColors = [
@@ -187,7 +184,7 @@ export default function StoryDisplay({
         className="mt-8 w-full py-3 px-6 bg-gradient-to-r from-pink-400 to-purple-500 text-white text-lg font-bold rounded-2xl shadow-md hover:shadow-lg transition-shadow flex items-center justify-center gap-2 font-comic no-print"
       >
         <RotateCcw className="w-5 h-5" />
-        <span>Generate Another!</span>
+        <span>Try Again!</span>
       </motion.button>
     </motion.div>
   );

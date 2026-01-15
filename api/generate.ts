@@ -181,6 +181,14 @@ STORY REQUIREMENTS:
 3. Each sentence should be its own clear thought
 4. Read your story aloud mentally - it should sound natural, not choppy
 
+GRAMMAR RULES (IMPORTANT - follow standard English grammar):
+- Use "an" before vowel sounds: "an ant", "an egg", "an owl", "an ice cream", "an umbrella"
+- Use "a" before consonant sounds: "a cat", "a dog", "a bird", "a unicorn" (sounds like "yoo")
+- Subject-verb agreement: "The cat runs" (singular), "The cats run" (plural)
+- Consistent tense: stick to past tense ("ran", "jumped", "said") or present tense throughout
+- Proper capitalization: start sentences with capitals, capitalize names
+- Complete thoughts: avoid sentence fragments unless intentional for younger readers (3-4 letter words)
+
 === PART 2: CHARACTER DESCRIPTIONS ===
 For EACH character or important object in your story, provide a detailed visual description.
 These are NOT limited by word length - be descriptive!
