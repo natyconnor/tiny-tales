@@ -45,7 +45,7 @@ export const IMAGE_MODELS = [
   {
     id: "nanobanana",
     name: "Nano Banana 🍌",
-    description: "Best quality (~6/day)",
+    description: "Excellent quality (~6/day)",
   },
   {
     id: "flux",
@@ -60,7 +60,7 @@ export const IMAGE_MODELS = [
   {
     id: "nanobanana-pro",
     name: "Nano Banana Pro",
-    description: "Highest quality (~1/day)",
+    description: "Best quality (~1/day)",
   },
 ];
 
