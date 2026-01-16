@@ -193,8 +193,11 @@ export default function StoryDisplay({
       {/* Generate Another Button */}
       <motion.button
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          opacity: { delay: 0.6 },
+          scale: { duration: 0.2, delay: 0 },
+        }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={onGenerateAnother}

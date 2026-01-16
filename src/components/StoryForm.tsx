@@ -255,7 +255,10 @@ export default function StoryForm({
       <motion.button
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.5, duration: 0.4 }}
+        transition={{
+          opacity: { delay: 0.5, duration: 0.4 },
+          scale: { duration: 0.2, delay: 0 }
+        }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={onGenerate}
