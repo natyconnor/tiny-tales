@@ -8,7 +8,7 @@ export const AVAILABLE_MODELS = [
   {
     id: "gemini-fast",
     name: "Gemini 2.5 Flash Lite",
-    description: "Fastest ⚡ (recommended)",
+    description: "Fastest ⚡",
   },
   {
     id: "deepseek",
@@ -18,12 +18,12 @@ export const AVAILABLE_MODELS = [
   {
     id: "openai",
     name: "GPT-5 Mini",
-    description: "Balanced quality",
+    description: "Slow 🐢",
   },
   {
     id: "gemini",
     name: "Gemini 3 Flash",
-    description: "Newest & capable",
+    description: "Newest 🚀",
   },
 ];
 
@@ -33,7 +33,6 @@ export const AVAILABLE_MODELS = [
 //   flux:          5000 images/pollen (essentially unlimited)
 //   turbo:         3300 images/pollen (essentially unlimited)
 //   gptimage:      70 images/pollen   (~17 stories/day with 1 pollen)
-//   seedream:      35 images/pollen   (~8 stories/day with 1 pollen)
 //   nanobanana:    25 images/pollen   (~6 stories/day with 1 pollen)
 //   nanobanana-pro:6 images/pollen    (~1 story/day with 1 pollen)
 // Each story uses 4 images
@@ -41,32 +40,27 @@ export const IMAGE_MODELS = [
   {
     id: "gptimage",
     name: "GPT Image",
-    description: "OpenAI (~17/day)",
+    description: "Balanced speed and quality (~17/day)",
   },
   {
     id: "nanobanana",
-    name: "Nano Banana ⭐",
+    name: "Nano Banana 🍌",
     description: "Best quality (~6/day)",
   },
   {
     id: "flux",
     name: "Flux Schnell",
-    description: "Fast & free (unlimited)",
-  },
-  {
-    id: "seedream",
-    name: "Seedream",
-    description: "ByteDance (~8/day)",
+    description: "Fast & free (but might have some issues)",
   },
   {
     id: "turbo",
     name: "SDXL Turbo",
-    description: "Fastest (unlimited)",
+    description: "Free with good quality",
   },
   {
     id: "nanobanana-pro",
     name: "Nano Banana Pro",
-    description: "4K quality (~1/day)",
+    description: "Highest quality (~1/day)",
   },
 ];
 
