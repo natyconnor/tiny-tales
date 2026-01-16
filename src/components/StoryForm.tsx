@@ -261,7 +261,7 @@ export default function StoryForm({
         animate={{ opacity: 1, scale: 1 }}
         transition={{
           opacity: { delay: 0.5, duration: 0.4 },
-          scale: { duration: 0.2, delay: 0 },
+          scale: { delay: 0, duration: 0.2 },
         }}
         whileHover={!isLoading && topic.trim() ? { scale: 1.02 } : {}}
         whileTap={!isLoading && topic.trim() ? { scale: 0.98 } : {}}
