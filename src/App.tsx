@@ -27,7 +27,11 @@ import {
 import ReadingModeModal from "./components/ReadingModeModal";
 import StoryDisplay from "./components/StoryDisplay";
 import StoryForm from "./components/StoryForm";
-import { MAX_STORED_STORIES, STORAGE_KEY } from "./constants/story";
+import {
+  MAX_STORED_STORIES,
+  STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
+} from "./constants/story";
 import type { ExportItem, Story } from "./types/story";
 import {
   captureImageToDataUrl,
@@ -37,11 +41,37 @@ import { renderExportCanvas } from "./utils/exportCanvas";
 import { splitStoryIntoSegments } from "./utils/storySegments";
 import { renderBookletDataUrl } from "./utils/bookletCanvas";
 
+type UserSettings = {
+  maxLetters: number;
+  model: string;
+  imageModel: string;
+};
+
+const DEFAULT_SETTINGS: UserSettings = {
+  maxLetters: 5,
+  model: "gemini-2.5-flash-lite",
+  imageModel: "gptimage",
+};
+
+function loadSettings(): UserSettings {
+  try {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<UserSettings>;
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
+  } catch {
+    console.error("Failed to load settings from localStorage");
+  }
+  return DEFAULT_SETTINGS;
+}
+
 function App() {
+  const initialSettings = loadSettings();
   const [topic, setTopic] = useState("");
-  const [maxLetters, setMaxLetters] = useState(5);
-  const [model, setModel] = useState("gemini-2.5-flash-lite");
-  const [imageModel, setImageModel] = useState("gptimage");
+  const [maxLetters, setMaxLetters] = useState(initialSettings.maxLetters);
+  const [model, setModel] = useState(initialSettings.model);
+  const [imageModel, setImageModel] = useState(initialSettings.imageModel);
   const [story, setStory] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [loadedImages, setLoadedImages] = useState<boolean[]>([]);
@@ -185,6 +215,12 @@ function App() {
       }
     }
   }, []);
+
+  // Save user settings to localStorage when they change
+  useEffect(() => {
+    const settings: UserSettings = { maxLetters, model, imageModel };
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  }, [maxLetters, model, imageModel]);
 
   // Save stories to localStorage
   const saveStory = useCallback((newStory: Story) => {

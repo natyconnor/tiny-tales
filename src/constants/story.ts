@@ -1,4 +1,5 @@
 export const STORAGE_KEY = "tiny-tales-stories";
+export const SETTINGS_STORAGE_KEY = "tiny-tales-settings";
 export const MAX_STORED_STORIES = 50;
 
 // Available Pollinations text models
