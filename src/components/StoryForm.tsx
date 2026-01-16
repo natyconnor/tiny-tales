@@ -73,6 +73,7 @@ export default function StoryForm({
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
         className="mb-6"
+        data-tutorial="prompt"
       >
         <div className="flex items-center gap-2 mb-2">
           <label className="block text-lg font-bold text-gray-700 font-comic">
@@ -154,6 +155,7 @@ export default function StoryForm({
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2, duration: 0.4 }}
         className="mb-6"
+        data-tutorial="word-length"
       >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
           📏 Maximum letters per word:{" "}
@@ -209,6 +211,7 @@ export default function StoryForm({
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.3, duration: 0.4 }}
         className="mb-6"
+        data-tutorial="story-ai"
       >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
           🤖 Story AI
@@ -233,6 +236,7 @@ export default function StoryForm({
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.4, duration: 0.4 }}
         className="mb-8"
+        data-tutorial="image-ai"
       >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
           🎨 Image AI

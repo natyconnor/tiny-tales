@@ -13,6 +13,8 @@ import BookletPrintContainer from "./components/BookletPrintContainer";
 import ExportPreviewModal from "./components/ExportPreviewModal";
 import FloatingShapes from "./components/FloatingShapes";
 import HistoryModal from "./components/HistoryModal";
+import OnboardingTutorial from "./components/OnboardingTutorial";
+import { useOnboarding } from "./hooks/useOnboarding";
 import ReadingModeModal from "./components/ReadingModeModal";
 import StoryDisplay from "./components/StoryDisplay";
 import StoryForm from "./components/StoryForm";
@@ -50,6 +52,7 @@ function App() {
   const [readingModeIndex, setReadingModeIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
+  const { showOnboarding, completeOnboarding } = useOnboarding();
 
   const syncLoadedImagesFromDom = useCallback(() => {
     setImageDataUrls((prev) => {
@@ -514,6 +517,12 @@ function App() {
           printContainerRef={printContainerRef}
         />
         <BookletPrintContainer bookletPreviewUrl={bookletPreviewUrl} />
+
+        <AnimatePresence>
+          {showOnboarding && (
+            <OnboardingTutorial onComplete={completeOnboarding} />
+          )}
+        </AnimatePresence>
 
         <motion.footer
           initial={{ opacity: 0 }}
