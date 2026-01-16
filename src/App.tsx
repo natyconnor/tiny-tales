@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Wand2 } from "lucide-react";
 import AppHeader from "./components/AppHeader";
 import ExportPrintContainer from "./components/ExportPrintContainer";
+import BookletPrintContainer from "./components/BookletPrintContainer";
 import ExportPreviewModal from "./components/ExportPreviewModal";
 import FloatingShapes from "./components/FloatingShapes";
 import HistoryModal from "./components/HistoryModal";
@@ -23,6 +24,7 @@ import {
 } from "./utils/imageCapture";
 import { renderExportCanvas } from "./utils/exportCanvas";
 import { splitStoryIntoSegments } from "./utils/storySegments";
+import { renderBookletDataUrl } from "./utils/bookletCanvas";
 
 function App() {
   const [topic, setTopic] = useState("");
@@ -40,6 +42,9 @@ function App() {
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [storageWarning, setStorageWarning] = useState(false);
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
+  const [bookletPreviewUrl, setBookletPreviewUrl] = useState<string | null>(
+    null
+  );
   const [showExportModal, setShowExportModal] = useState(false);
   const [showReadingMode, setShowReadingMode] = useState(false);
   const [readingModeIndex, setReadingModeIndex] = useState(0);
@@ -52,6 +57,26 @@ function App() {
       return changed ? next : prev;
     });
   }, []);
+
+  const buildBookletPayload = useCallback(() => {
+    const { next, changed } = captureLoadedImagesFromDom(imageDataUrls);
+    if (changed) {
+      setImageDataUrls(next);
+    }
+    const paddedImages: Array<string | undefined> = [...next];
+    while (paddedImages.length < 4) {
+      paddedImages.push(undefined);
+    }
+    const segments = splitStoryIntoSegments(story, 4);
+    while (segments.length < 4) {
+      segments.push("");
+    }
+    return {
+      topic,
+      imageDataUrls: paddedImages,
+      segments,
+    };
+  }, [imageDataUrls, story, topic]);
 
   // Auto-generate export preview when all images are loaded
   const generateExportPreview = useCallback(async () => {
@@ -67,6 +92,15 @@ function App() {
       console.error("Failed to generate preview:", error);
     }
   }, [story, imageUrls, imageDataUrls, topic]);
+
+  const generateBookletPreview = useCallback(async () => {
+    try {
+      const dataUrl = await renderBookletDataUrl(buildBookletPayload());
+      setBookletPreviewUrl(dataUrl);
+    } catch (error) {
+      console.error("Failed to generate booklet preview:", error);
+    }
+  }, [buildBookletPayload]);
 
   // Auto-generate preview when all images are captured
   useEffect(() => {
@@ -85,6 +119,27 @@ function App() {
     exportPreviewUrl,
     generateExportPreview,
   ]);
+
+  useEffect(() => {
+    if (!story || imageUrls.length === 0) return;
+
+    const capturedCount = imageDataUrls.filter(Boolean).length;
+    if (capturedCount < imageUrls.length) return;
+
+    if (bookletPreviewUrl) return;
+
+    generateBookletPreview();
+  }, [
+    story,
+    imageUrls.length,
+    imageDataUrls,
+    bookletPreviewUrl,
+    generateBookletPreview,
+  ]);
+
+  useEffect(() => {
+    document.body.dataset.bookletReady = bookletPreviewUrl ? "true" : "false";
+  }, [bookletPreviewUrl]);
 
   // Focus input on page load
   useEffect(() => {
@@ -131,6 +186,7 @@ function App() {
     setLoadedImages([]);
     setImageDataUrls([]);
     setExportPreviewUrl(null);
+    setBookletPreviewUrl(null);
 
     try {
       const response = await fetch("/api/generate", {
@@ -238,6 +294,7 @@ function App() {
     setLoadedImages(new Array(savedStory.imageUrls?.length || 0).fill(false));
     setImageDataUrls([]);
     setExportPreviewUrl(null);
+    setBookletPreviewUrl(null);
     setShowHistory(false);
 
     // Capture any cached images that may already be in the DOM
@@ -265,6 +322,30 @@ function App() {
   const openReadingMode = () => {
     setReadingModeIndex(0);
     setShowReadingMode(true);
+  };
+
+  const getBookletFileName = () => {
+    const slug = topic
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return `tiny-tale-${slug || "story"}-booklet.png`;
+  };
+
+  const downloadDataUrl = (dataUrl: string, fileName: string) => {
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const downloadMiniBook = async () => {
+    const dataUrl = await renderBookletDataUrl(buildBookletPayload());
+    setBookletPreviewUrl(dataUrl);
+    downloadDataUrl(dataUrl, getBookletFileName());
   };
 
   const exportSegments = splitStoryIntoSegments(
@@ -388,6 +469,7 @@ function App() {
                 onDownloadImage={downloadAsImage}
                 onGenerateAnother={generateStory}
                 onOpenReadingMode={openReadingMode}
+                onPrintMiniBook={downloadMiniBook}
               />
             )}
           </AnimatePresence>
@@ -431,6 +513,7 @@ function App() {
           exportItems={exportItems}
           printContainerRef={printContainerRef}
         />
+        <BookletPrintContainer bookletPreviewUrl={bookletPreviewUrl} />
 
         <motion.footer
           initial={{ opacity: 0 }}

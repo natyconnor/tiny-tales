@@ -185,9 +185,33 @@ body {
     display: none !important;
   }
 
+  body[data-booklet-ready="true"] * {
+    visibility: hidden !important;
+  }
+
+  body[data-booklet-ready="true"] [data-booklet-print],
+  body[data-booklet-ready="true"] [data-booklet-print] * {
+    visibility: visible !important;
+  }
+
+  body[data-booklet-ready="true"] [data-booklet-print] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8.5in;
+    height: 11in;
+  }
+
+  body[data-booklet-ready="true"] .booklet-print-image {
+    width: 8.5in;
+    height: 11in;
+    object-fit: contain;
+    display: block;
+  }
+
   /* Page setup */
   @page {
     size: letter;
-    margin: 0.5in;
+    margin: 0;
   }
 }

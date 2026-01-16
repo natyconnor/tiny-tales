@@ -1,8 +1,9 @@
 import type { SyntheticEvent } from "react";
 import { motion } from "motion/react";
-import { Download, RotateCcw, BookOpen } from "lucide-react";
+import { Download, RotateCcw, BookOpen, Printer } from "lucide-react";
 
 import { splitStoryIntoSegments } from "../utils/storySegments";
+import Tooltip from "./Tooltip";
 
 type StoryDisplayProps = {
   story: string;
@@ -14,6 +15,7 @@ type StoryDisplayProps = {
   onDownloadImage: () => void;
   onGenerateAnother: () => void;
   onOpenReadingMode: () => void;
+  onPrintMiniBook: () => void;
 };
 
 const renderStory = (text: string) => {
@@ -39,6 +41,7 @@ export default function StoryDisplay({
   onDownloadImage,
   onGenerateAnother,
   onOpenReadingMode,
+  onPrintMiniBook,
 }: StoryDisplayProps) {
   const segments = splitStoryIntoSegments(story, Math.max(imageUrls.length, 1));
 
@@ -75,30 +78,44 @@ export default function StoryDisplay({
         </h2>
         <div className="flex items-center gap-2">
           {imageUrls.length > 0 && (
+            <>
+              <Tooltip text="Reading Mode - Fullscreen story view">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onOpenReadingMode}
+                  className="p-2 bg-purple-100 hover:bg-purple-200 rounded-full transition-colors"
+                >
+                  <BookOpen className="w-5 h-5 text-purple-600" />
+                </motion.button>
+              </Tooltip>
+              <Tooltip text="Download Mini-Book - Foldable booklet format">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onPrintMiniBook}
+                  className="p-2 bg-fuchsia-100 hover:bg-fuchsia-200 rounded-full transition-colors"
+                >
+                  <Printer className="w-5 h-5 text-fuchsia-600" />
+                </motion.button>
+              </Tooltip>
+            </>
+          )}
+          <Tooltip text="Download Image - Save story as PNG">
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={onOpenReadingMode}
-              className="p-2 bg-purple-100 hover:bg-purple-200 rounded-full transition-colors"
-              title="Reading Mode"
+              onClick={onDownloadImage}
+              disabled={isGeneratingImage}
+              className="p-2 bg-pink-100 hover:bg-pink-200 rounded-full transition-colors disabled:opacity-50"
             >
-              <BookOpen className="w-5 h-5 text-purple-600" />
+              {isGeneratingImage ? (
+                <div className="w-5 h-5 border-2 border-pink-300 border-t-pink-600 rounded-full animate-spin" />
+              ) : (
+                <Download className="w-5 h-5 text-pink-600" />
+              )}
             </motion.button>
-          )}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={onDownloadImage}
-            disabled={isGeneratingImage}
-            className="p-2 bg-pink-100 hover:bg-pink-200 rounded-full transition-colors disabled:opacity-50"
-            title="Download as image"
-          >
-            {isGeneratingImage ? (
-              <div className="w-5 h-5 border-2 border-pink-300 border-t-pink-600 rounded-full animate-spin" />
-            ) : (
-              <Download className="w-5 h-5 text-pink-600" />
-            )}
-          </motion.button>
+          </Tooltip>
         </div>
       </motion.div>
 
