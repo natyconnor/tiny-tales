@@ -13,8 +13,17 @@ import BookletPrintContainer from "./components/BookletPrintContainer";
 import ExportPreviewModal from "./components/ExportPreviewModal";
 import FloatingShapes from "./components/FloatingShapes";
 import HistoryModal from "./components/HistoryModal";
-import OnboardingTutorial from "./components/OnboardingTutorial";
-import { useOnboarding } from "./hooks/useOnboarding";
+import Tutorial from "./components/OnboardingTutorial";
+import {
+  INITIAL_TUTORIAL_STEPS,
+  POST_STORY_TUTORIAL_STEPS,
+} from "./constants/tutorial";
+import {
+  useOnboarding,
+  usePostStoryOnboarding,
+  ONBOARDING_KEY,
+  POST_STORY_ONBOARDING_KEY,
+} from "./hooks/useOnboarding";
 import ReadingModeModal from "./components/ReadingModeModal";
 import StoryDisplay from "./components/StoryDisplay";
 import StoryForm from "./components/StoryForm";
@@ -53,6 +62,11 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
   const { showOnboarding, completeOnboarding } = useOnboarding();
+  const {
+    showPostStoryOnboarding,
+    triggerPostStoryOnboarding,
+    completePostStoryOnboarding,
+  } = usePostStoryOnboarding();
 
   const syncLoadedImagesFromDom = useCallback(() => {
     setImageDataUrls((prev) => {
@@ -139,6 +153,17 @@ function App() {
     bookletPreviewUrl,
     generateBookletPreview,
   ]);
+
+  // Trigger post-story tutorial when first story is fully loaded
+  useEffect(() => {
+    if (!story || imageUrls.length === 0) return;
+
+    const capturedCount = imageDataUrls.filter(Boolean).length;
+    if (capturedCount < imageUrls.length) return;
+
+    // All images loaded - trigger post-story onboarding
+    triggerPostStoryOnboarding();
+  }, [story, imageUrls.length, imageDataUrls, triggerPostStoryOnboarding]);
 
   useEffect(() => {
     document.body.dataset.bookletReady = bookletPreviewUrl ? "true" : "false";
@@ -520,7 +545,21 @@ function App() {
 
         <AnimatePresence>
           {showOnboarding && (
-            <OnboardingTutorial onComplete={completeOnboarding} />
+            <Tutorial
+              steps={INITIAL_TUTORIAL_STEPS}
+              storageKey={ONBOARDING_KEY}
+              onComplete={completeOnboarding}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showPostStoryOnboarding && (
+            <Tutorial
+              steps={POST_STORY_TUTORIAL_STEPS}
+              storageKey={POST_STORY_ONBOARDING_KEY}
+              onComplete={completePostStoryOnboarding}
+            />
           )}
         </AnimatePresence>
 

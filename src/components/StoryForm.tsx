@@ -301,6 +301,7 @@ export default function StoryForm({
           whileTap={{ scale: 0.98 }}
           onClick={onToggleHistory}
           className="mt-4 w-full py-2 px-4 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center gap-2 transition-colors font-lexend"
+          data-tutorial="history"
         >
           <History className="w-5 h-5" />
           <span>My Story History ({savedStoriesCount})</span>
