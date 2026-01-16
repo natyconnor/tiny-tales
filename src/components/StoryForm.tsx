@@ -257,13 +257,17 @@ export default function StoryForm({
         animate={{ opacity: 1, scale: 1 }}
         transition={{
           opacity: { delay: 0.5, duration: 0.4 },
-          scale: { duration: 0.2, delay: 0 }
+          scale: { duration: 0.2, delay: 0 },
         }}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+        whileHover={!isLoading && topic.trim() ? { scale: 1.02 } : {}}
+        whileTap={!isLoading && topic.trim() ? { scale: 0.98 } : {}}
         onClick={onGenerate}
         disabled={isLoading || !topic.trim()}
-        className="w-full py-4 px-6 bg-gradient-to-r from-pink-400 via-fuchsia-500 to-purple-500 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-comic"
+        className={`w-full py-4 px-6 text-xl font-bold rounded-2xl flex items-center justify-center gap-3 font-comic transition-all ${
+          isLoading || !topic.trim()
+            ? "bg-gray-300 text-gray-500 shadow-none cursor-not-allowed"
+            : "bg-gradient-to-r from-pink-400 via-fuchsia-500 to-purple-500 text-white shadow-lg hover:shadow-xl"
+        }`}
       >
         {isLoading ? (
           <>
