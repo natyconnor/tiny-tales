@@ -21,9 +21,9 @@ const TITLE_GAP = 0.12 * DPI;
 const ptToPx = (pt: number) => Math.round((pt * DPI) / 72);
 
 const TITLE_FONT_SIZE = ptToPx(22);
-const SUBTITLE_FONT_SIZE = ptToPx(14);
-const TEXT_FONT_SIZE = ptToPx(12);
-const FOOTER_FONT_SIZE = ptToPx(9);
+const SUBTITLE_FONT_SIZE = ptToPx(20);
+const TEXT_FONT_SIZE = ptToPx(18);
+const FOOTER_FONT_SIZE = ptToPx(12);
 const LINE_HEIGHT = Math.round(TEXT_FONT_SIZE * 1.35);
 
 const TITLE_FONT = `${TITLE_FONT_SIZE}px "Comic Neue", cursive`;

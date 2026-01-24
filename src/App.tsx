@@ -69,6 +69,7 @@ function loadSettings(): UserSettings {
 function App() {
   const initialSettings = loadSettings();
   const [topic, setTopic] = useState("");
+  const [title, setTitle] = useState("");
   const [maxLetters, setMaxLetters] = useState(initialSettings.maxLetters);
   const [model, setModel] = useState(initialSettings.model);
   const [imageModel, setImageModel] = useState(initialSettings.imageModel);
@@ -119,11 +120,11 @@ function App() {
       segments.push("");
     }
     return {
-      topic,
+      topic: title || topic,
       imageDataUrls: paddedImages,
       segments,
     };
-  }, [imageDataUrls, story, topic]);
+  }, [imageDataUrls, story, title, topic]);
 
   // Auto-generate export preview when all images are loaded
   const generateExportPreview = useCallback(async () => {
@@ -246,6 +247,7 @@ function App() {
     setIsLoading(true);
     setError("");
     setStory("");
+    setTitle("");
     setImageUrls([]);
     setLoadedImages([]);
     setImageDataUrls([]);
@@ -285,7 +287,9 @@ function App() {
       );
       console.log("==============================");
 
+      const storyTitle = data.title || topic.trim();
       setStory(data.story);
+      setTitle(storyTitle);
 
       // Set image URLs and initialize loading state
       const urls = data.imageUrls || [];
@@ -296,6 +300,7 @@ function App() {
       saveStory({
         id: Date.now().toString(),
         topic: topic.trim(),
+        title: storyTitle,
         maxLetters,
         content: data.story,
         imageUrls: urls,
@@ -352,6 +357,7 @@ function App() {
 
   const loadStory = (savedStory: Story) => {
     setTopic(savedStory.topic);
+    setTitle(savedStory.title || savedStory.topic);
     setMaxLetters(savedStory.maxLetters);
     setStory(savedStory.content);
     setImageUrls(savedStory.imageUrls || []);

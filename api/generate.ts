@@ -152,10 +152,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Get skill-level-specific guidance
     const skillGuidance = getSkillLevelGuidance(maxLetters);
 
-    // Create the prompt - requesting JSON with story + character descriptions + image prompts
-    const prompt = `Create a simple, fun children's story about "${topic}" with detailed character descriptions and 4 illustration prompts.
+    // Create the prompt - requesting JSON with title + story + character descriptions + image prompts
+    const prompt = `Create a simple, fun children's story about "${topic}" with a title, detailed character descriptions, and 4 illustration prompts.
 
-=== PART 1: STORY TEXT ===
+=== PART 1: TITLE ===
+Create a short, catchy title for this children's book (2-5 words). The title should:
+- Be memorable and fun
+- Capture the essence of the story
+- Appeal to young readers
+- NOT just repeat the topic verbatim
+
+Examples of good titles:
+- Topic "a cat who loves pizza" → "Pizza Paws"
+- Topic "dinosaur at school" → "Dino's First Day"
+- Topic "bunny learns to share" → "The Sharing Bunny"
+
+=== PART 2: STORY TEXT ===
 Write a story for early readers where ALL words are ${maxLetters} letters or fewer.
 
 SKILL LEVEL: ${skillGuidance.complexity}
@@ -219,6 +231,7 @@ Example of a BAD prompt:
 === RESPONSE FORMAT ===
 Respond with ONLY valid JSON (no markdown, no code blocks):
 {
+  "title": "Short catchy book title (2-5 words)",
   "story": "The simple story text with ${maxLetters}-letter-max words...",
   "characters": {
     "characterName": "Full visual description of this character"
@@ -290,6 +303,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 
     // Parse the JSON response
     let parsed: {
+      title?: string;
       story: string;
       characters?: Record<string, string>;
       imagePrompts: string[];
@@ -315,6 +329,10 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
     if (!parsed.story || typeof parsed.story !== "string") {
       throw new Error("Invalid response: missing story text");
     }
+
+    // Use generated title or fall back to topic
+    const title = parsed.title?.trim() || topic;
+    log(`Title: "${title}"`);
 
     // Ensure we have exactly 4 image prompts (or empty array as fallback)
     const imagePrompts = Array.isArray(parsed.imagePrompts)
@@ -349,6 +367,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
     log(`Generated ${imageUrls.length} Pollinations URLs`);
 
     return res.status(200).json({
+      title,
       story: parsed.story,
       characters: parsed.characters || {},
       imagePrompts,
