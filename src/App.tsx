@@ -355,6 +355,14 @@ function App() {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  const deleteStory = useCallback((storyId: string) => {
+    setSavedStories((prev) => {
+      const updated = prev.filter((story) => story.id !== storyId);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   const loadStory = (savedStory: Story) => {
     setTopic(savedStory.topic);
     setTitle(savedStory.title || savedStory.topic);
@@ -551,6 +559,7 @@ function App() {
               savedStories={savedStories}
               onClose={() => setShowHistory(false)}
               onLoadStory={loadStory}
+              onDeleteStory={deleteStory}
               onClearHistory={clearHistory}
             />
           )}

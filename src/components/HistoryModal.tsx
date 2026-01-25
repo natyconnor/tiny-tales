@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { History, Trash2, X } from "lucide-react";
 
 import { MAX_STORED_STORIES } from "../constants/story";
@@ -12,6 +12,7 @@ type HistoryModalProps = {
   savedStories: Story[];
   onClose: () => void;
   onLoadStory: (story: Story) => void;
+  onDeleteStory: (storyId: string) => void;
   onClearHistory: () => void;
 };
 
@@ -19,6 +20,7 @@ export default function HistoryModal({
   savedStories,
   onClose,
   onLoadStory,
+  onDeleteStory,
   onClearHistory,
 }: HistoryModalProps) {
   return (
@@ -61,41 +63,66 @@ export default function HistoryModal({
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-          {savedStories.map((savedStory, index) => {
-            const imageModelId =
-              savedStory.imageUrls && savedStory.imageUrls.length > 0
-                ? extractImageModelFromUrl(savedStory.imageUrls[0])
-                : null;
-            const imageModelName = getImageModelDisplayName(imageModelId);
+          <AnimatePresence mode="popLayout">
+            {savedStories.map((savedStory) => {
+              const imageModelId =
+                savedStory.imageUrls && savedStory.imageUrls.length > 0
+                  ? extractImageModelFromUrl(savedStory.imageUrls[0])
+                  : null;
+              const imageModelName = getImageModelDisplayName(imageModelId);
 
-            return (
-              <motion.button
-                key={savedStory.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onLoadStory(savedStory)}
-                className="w-full p-4 bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 rounded-2xl text-left transition-all border-2 border-transparent hover:border-purple-200 hover:shadow-md"
-              >
-                <p className="font-bold text-gray-700 font-comic truncate">
-                  {savedStory.topic}
-                </p>
-                <p className="text-sm text-gray-500 font-lexend mt-1">
-                  Max {savedStory.maxLetters} letters •{" "}
-                  {new Date(savedStory.createdAt).toLocaleDateString()}
-                </p>
-                {imageModelId && (
-                  <p className="text-xs text-purple-600 font-lexend mt-1">
-                    🎨 {imageModelName}
-                  </p>
-                )}
-                <p className="text-gray-600 font-lexend mt-2 line-clamp-2 text-sm">
-                  {savedStory.content.slice(0, 100)}...
-                </p>
-              </motion.button>
-            );
-          })}
+              return (
+                <motion.div
+                  key={savedStory.id}
+                  layout
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 50, scale: 0.9 }}
+                  transition={{
+                    layout: { type: "spring", damping: 25, stiffness: 300 },
+                    opacity: { duration: 0.2 },
+                    x: { duration: 0.2 },
+                    scale: { duration: 0.2 },
+                  }}
+                  className="relative group"
+                >
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => onLoadStory(savedStory)}
+                    className="w-full p-4 bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 rounded-2xl text-left transition-all border-2 border-transparent hover:border-purple-200 hover:shadow-md pr-12"
+                  >
+                    <p className="font-bold text-gray-700 font-comic truncate">
+                      {savedStory.topic}
+                    </p>
+                    <p className="text-sm text-gray-500 font-lexend mt-1">
+                      Max {savedStory.maxLetters} letters •{" "}
+                      {new Date(savedStory.createdAt).toLocaleDateString()}
+                    </p>
+                    {imageModelId && (
+                      <p className="text-xs text-purple-600 font-lexend mt-1">
+                        🎨 {imageModelName}
+                      </p>
+                    )}
+                    <p className="text-gray-600 font-lexend mt-2 line-clamp-2 text-sm">
+                      {savedStory.content.slice(0, 100)}...
+                    </p>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteStory(savedStory.id);
+                    }}
+                    className="absolute top-4 right-4 p-2 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded-full transition-all text-gray-400 hover:text-red-500"
+                    title="Delete story"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </motion.button>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
 
         <motion.button
