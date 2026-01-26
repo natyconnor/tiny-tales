@@ -138,13 +138,14 @@ function App() {
         imageUrls,
         imageDataUrls,
         topic,
+        title,
         allCaps,
       });
       setExportPreviewUrl(canvas.toDataURL("image/png"));
     } catch (error) {
       console.error("Failed to generate preview:", error);
     }
-  }, [story, imageUrls, imageDataUrls, topic, allCaps]);
+  }, [story, imageUrls, imageDataUrls, topic, title, allCaps]);
 
   const generateBookletPreview = useCallback(async () => {
     try {
@@ -555,6 +556,7 @@ function App() {
           <AnimatePresence mode="wait">
             {story && !isLoading && (
               <StoryDisplay
+                title={title || topic}
                 story={story}
                 imageUrls={imageUrls}
                 loadedImages={loadedImages}

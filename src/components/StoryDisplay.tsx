@@ -6,6 +6,7 @@ import { splitStoryIntoSegments } from "../utils/storySegments";
 import Tooltip from "./Tooltip";
 
 type StoryDisplayProps = {
+  title: string;
   story: string;
   imageUrls: string[];
   loadedImages: boolean[];
@@ -35,6 +36,7 @@ const renderStory = (text: string, allCaps: boolean) => {
 };
 
 export default function StoryDisplay({
+  title,
   story,
   imageUrls,
   loadedImages,
@@ -79,7 +81,7 @@ export default function StoryDisplay({
         className="flex items-center justify-between mb-6 no-print"
       >
         <h2 className="text-2xl font-bold text-gray-700 font-comic flex items-center gap-2">
-          <span>📖</span> Your Story
+          <span>📖</span> {title}
         </h2>
         <div className="flex items-center gap-2">
           {imageUrls.length > 0 && (

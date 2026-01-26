@@ -5,6 +5,7 @@ type ExportCanvasOptions = {
   imageUrls: string[];
   imageDataUrls: string[];
   topic: string;
+  title?: string;
   allCaps?: boolean;
 };
 
@@ -49,10 +50,16 @@ export const renderExportCanvas = async ({
   imageUrls,
   imageDataUrls,
   topic,
+  title,
   allCaps = false,
 }: ExportCanvasOptions): Promise<HTMLCanvasElement> => {
-  const rawSegments = splitStoryIntoSegments(story, Math.max(imageUrls.length, 1));
-  const segments = allCaps ? rawSegments.map((s) => s.toUpperCase()) : rawSegments;
+  const rawSegments = splitStoryIntoSegments(
+    story,
+    Math.max(imageUrls.length, 1)
+  );
+  const segments = allCaps
+    ? rawSegments.map((s) => s.toUpperCase())
+    : rawSegments;
   const items = imageUrls.map((_, index) => ({
     dataUrl: imageDataUrls[index],
     segment: segments[index] || "",
@@ -108,10 +115,7 @@ export const renderExportCanvas = async ({
     const end = start + columns;
     const rowItems = textLayouts.slice(start, end);
     rowTextHeights.push(
-      rowItems.reduce(
-        (max, item) => Math.max(max, item.height),
-        minTextHeight
-      )
+      rowItems.reduce((max, item) => Math.max(max, item.height), minTextHeight)
     );
   }
 
@@ -211,20 +215,9 @@ export const renderExportCanvas = async ({
   ctx.textBaseline = "top";
   ctx.fillStyle = "#7C3AED";
   ctx.font = titleFont;
-  ctx.fillText("Tiny Tales", canvasWidth / 2, padding + topBarHeight + 6);
 
-  ctx.font = subtitleFont;
-  const subtitleY = padding + topBarHeight + 6 + titleHeight - 6;
-  const label = "A story about:";
-  const labelWidth = ctx.measureText(label).width;
-  const topicWidth = ctx.measureText(topic).width;
-  const totalWidth = labelWidth + 6 + topicWidth;
-  const startX = (canvasWidth - totalWidth) / 2;
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#6B7280";
-  ctx.fillText(label, startX, subtitleY);
-  ctx.fillStyle = "#EC4899";
-  ctx.fillText(topic, startX + labelWidth + 6, subtitleY);
+  const displayTitle = title || topic;
+  ctx.fillText(displayTitle, canvasWidth / 2, padding + topBarHeight + 6);
 
   let y = gridTop;
 
