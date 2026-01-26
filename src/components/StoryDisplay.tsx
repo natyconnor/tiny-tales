@@ -1,6 +1,6 @@
 import type { SyntheticEvent } from "react";
 import { motion } from "motion/react";
-import { Download, RotateCcw, BookOpen, Printer } from "lucide-react";
+import { Download, RotateCcw, BookOpen, Printer, CaseSensitive } from "lucide-react";
 
 import { splitStoryIntoSegments } from "../utils/storySegments";
 import Tooltip from "./Tooltip";
@@ -10,16 +10,19 @@ type StoryDisplayProps = {
   imageUrls: string[];
   loadedImages: boolean[];
   isGeneratingImage: boolean;
+  allCaps: boolean;
   onImageLoad: (index: number, event: SyntheticEvent<HTMLImageElement>) => void;
   onImageError: (index: number, url: string) => void;
   onDownloadImage: () => void;
   onGenerateAnother: () => void;
   onOpenReadingMode: () => void;
   onPrintMiniBook: () => void;
+  onAllCapsChange: (value: boolean) => void;
 };
 
-const renderStory = (text: string) => {
-  return text.split(/(\s+)/).map((word, index) => {
+const renderStory = (text: string, allCaps: boolean) => {
+  const displayText = allCaps ? text.toUpperCase() : text;
+  return displayText.split(/(\s+)/).map((word, index) => {
     if (word.trim() === "") {
       return <span key={index}>{word}</span>;
     }
@@ -36,12 +39,14 @@ export default function StoryDisplay({
   imageUrls,
   loadedImages,
   isGeneratingImage,
+  allCaps,
   onImageLoad,
   onImageError,
   onDownloadImage,
   onGenerateAnother,
   onOpenReadingMode,
   onPrintMiniBook,
+  onAllCapsChange,
 }: StoryDisplayProps) {
   const segments = splitStoryIntoSegments(story, Math.max(imageUrls.length, 1));
 
@@ -116,6 +121,20 @@ export default function StoryDisplay({
               )}
             </motion.button>
           </Tooltip>
+          <Tooltip text={allCaps ? "Switch to normal case" : "Switch to ALL CAPS"}>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onAllCapsChange(!allCaps)}
+              className={`p-2 rounded-full transition-colors ${
+                allCaps
+                  ? "bg-violet-200 hover:bg-violet-300"
+                  : "bg-violet-100 hover:bg-violet-200"
+              }`}
+            >
+              <CaseSensitive className={`w-5 h-5 ${allCaps ? "text-violet-700" : "text-violet-600"}`} />
+            </motion.button>
+          </Tooltip>
         </div>
       </motion.div>
 
@@ -128,7 +147,7 @@ export default function StoryDisplay({
             transition={{ delay: 0.3 }}
             className="text-xl md:text-2xl leading-relaxed text-gray-800 font-lexend font-medium story-text"
           >
-            {renderStory(story)}
+            {renderStory(story, allCaps)}
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -181,7 +200,7 @@ export default function StoryDisplay({
                 {/* Corresponding text segment */}
                 {segments[index] && (
                   <div className="text-base md:text-lg leading-relaxed text-gray-800 font-lexend font-medium story-text px-1">
-                    {renderStory(segments[index])}
+                    {renderStory(segments[index], allCaps)}
                   </div>
                 )}
               </motion.div>

@@ -2,6 +2,7 @@ type BookletCanvasOptions = {
   topic: string;
   imageDataUrls: Array<string | undefined>;
   segments: string[];
+  allCaps?: boolean;
 };
 
 const DPI = 300;
@@ -20,16 +21,40 @@ const TITLE_GAP = 0.12 * DPI;
 
 const ptToPx = (pt: number) => Math.round((pt * DPI) / 72);
 
-const TITLE_FONT_SIZE = ptToPx(22);
-const SUBTITLE_FONT_SIZE = ptToPx(20);
-const TEXT_FONT_SIZE = ptToPx(18);
+const TITLE_FONT_SIZE = ptToPx(26);
 const FOOTER_FONT_SIZE = ptToPx(12);
-const LINE_HEIGHT = Math.round(TEXT_FONT_SIZE * 1.35);
+
+// Dynamic text sizing based on total character count per page
+const MAX_TEXT_FONT_PT = 22;
+const MIN_TEXT_FONT_PT = 14;
+const SHORT_TEXT_THRESHOLD = 30; // Character count for max font size (e.g., "The cat sat.")
+const LONG_TEXT_THRESHOLD = 150; // Character count for min font size
+
+const getTextFontSize = (text: string): number => {
+  const charCount = text.length;
+
+  if (charCount <= SHORT_TEXT_THRESHOLD) {
+    return ptToPx(MAX_TEXT_FONT_PT);
+  }
+
+  if (charCount >= LONG_TEXT_THRESHOLD) {
+    return ptToPx(MIN_TEXT_FONT_PT);
+  }
+
+  // Linear interpolation between thresholds
+  const ratio =
+    (charCount - SHORT_TEXT_THRESHOLD) /
+    (LONG_TEXT_THRESHOLD - SHORT_TEXT_THRESHOLD);
+  const fontPt =
+    MAX_TEXT_FONT_PT - ratio * (MAX_TEXT_FONT_PT - MIN_TEXT_FONT_PT);
+  return ptToPx(fontPt);
+};
+
+const getLineHeight = (fontSize: number): number => Math.round(fontSize * 1.35);
 
 const TITLE_FONT = `${TITLE_FONT_SIZE}px "Comic Neue", cursive`;
-const SUBTITLE_FONT = `${SUBTITLE_FONT_SIZE}px "Lexend", sans-serif`;
-const BODY_FONT = `${TEXT_FONT_SIZE}px "Lexend", sans-serif`;
 const FOOTER_FONT = `${FOOTER_FONT_SIZE}px "Lexend", sans-serif`;
+const getBodyFont = (fontSize: number) => `${fontSize}px "Lexend", sans-serif`;
 
 const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -170,20 +195,22 @@ const drawPanelContent = async ({
   }
 
   if (text) {
-    ctx.font = BODY_FONT;
+    const textFontSize = getTextFontSize(text);
+    const lineHeight = getLineHeight(textFontSize);
+    ctx.font = getBodyFont(textFontSize);
     ctx.fillStyle = "#1F2937";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const lines = wrapTextLines(ctx, text, contentWidth);
     const remainingHeight = y + height - PADDING - currentY;
-    const maxLines = Math.floor(remainingHeight / LINE_HEIGHT);
+    const maxLines = Math.floor(remainingHeight / lineHeight);
     const clipped = clampLines(lines, maxLines);
 
     clipped.forEach((line, index) => {
-      ctx.fillText(line, x + width / 2, currentY + index * LINE_HEIGHT);
+      ctx.fillText(line, x + width / 2, currentY + index * lineHeight);
     });
 
-    currentY += clipped.length * LINE_HEIGHT + TEXT_GAP;
+    currentY += clipped.length * lineHeight + TEXT_GAP;
   }
 
   if (isBackCover) {
@@ -230,11 +257,6 @@ const drawCoverContent = async ({
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
 
-  ctx.font = SUBTITLE_FONT;
-  ctx.fillStyle = "#6B7280";
-  ctx.fillText("A Story About", x + width / 2, currentY);
-  currentY += SUBTITLE_FONT_SIZE + TITLE_GAP;
-
   ctx.font = TITLE_FONT;
   ctx.fillStyle = "#111827";
   const titleLines = clampLines(wrapTextLines(ctx, topic, contentWidth), 2);
@@ -261,15 +283,17 @@ const drawCoverContent = async ({
   }
 
   if (text) {
-    ctx.font = BODY_FONT;
+    const textFontSize = getTextFontSize(text);
+    const lineHeight = getLineHeight(textFontSize);
+    ctx.font = getBodyFont(textFontSize);
     ctx.fillStyle = "#1F2937";
     const lines = wrapTextLines(ctx, text, contentWidth);
     const remainingHeight = y + height - PADDING - currentY;
-    const maxLines = Math.floor(remainingHeight / LINE_HEIGHT);
+    const maxLines = Math.floor(remainingHeight / lineHeight);
     const clipped = clampLines(lines, maxLines);
 
     clipped.forEach((line, index) => {
-      ctx.fillText(line, x + width / 2, currentY + index * LINE_HEIGHT);
+      ctx.fillText(line, x + width / 2, currentY + index * lineHeight);
     });
   }
 };
@@ -310,9 +334,13 @@ const drawPanel = async ({
 export const renderBookletCanvas = async ({
   topic,
   imageDataUrls,
-  segments,
+  segments: rawSegments,
+  allCaps = false,
 }: BookletCanvasOptions): Promise<HTMLCanvasElement> => {
   await ensureFontsReady();
+  const segments = allCaps
+    ? rawSegments.map((s) => s.toUpperCase())
+    : rawSegments;
 
   const canvas = document.createElement("canvas");
   canvas.width = PAGE_WIDTH;

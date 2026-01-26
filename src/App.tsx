@@ -45,12 +45,14 @@ type UserSettings = {
   maxLetters: number;
   model: string;
   imageModel: string;
+  allCaps: boolean;
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
   maxLetters: 5,
   model: "gemini-2.5-flash-lite",
   imageModel: "gptimage",
+  allCaps: false,
 };
 
 function loadSettings(): UserSettings {
@@ -73,6 +75,7 @@ function App() {
   const [maxLetters, setMaxLetters] = useState(initialSettings.maxLetters);
   const [model, setModel] = useState(initialSettings.model);
   const [imageModel, setImageModel] = useState(initialSettings.imageModel);
+  const [allCaps, setAllCaps] = useState(initialSettings.allCaps);
   const [story, setStory] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [loadedImages, setLoadedImages] = useState<boolean[]>([]);
@@ -123,8 +126,9 @@ function App() {
       topic: title || topic,
       imageDataUrls: paddedImages,
       segments,
+      allCaps,
     };
-  }, [imageDataUrls, story, title, topic]);
+  }, [imageDataUrls, story, title, topic, allCaps]);
 
   // Auto-generate export preview when all images are loaded
   const generateExportPreview = useCallback(async () => {
@@ -134,12 +138,13 @@ function App() {
         imageUrls,
         imageDataUrls,
         topic,
+        allCaps,
       });
       setExportPreviewUrl(canvas.toDataURL("image/png"));
     } catch (error) {
       console.error("Failed to generate preview:", error);
     }
-  }, [story, imageUrls, imageDataUrls, topic]);
+  }, [story, imageUrls, imageDataUrls, topic, allCaps]);
 
   const generateBookletPreview = useCallback(async () => {
     try {
@@ -167,6 +172,18 @@ function App() {
     exportPreviewUrl,
     generateExportPreview,
   ]);
+
+  // Regenerate previews when allCaps changes
+  useEffect(() => {
+    if (!story || imageUrls.length === 0) return;
+
+    const capturedCount = imageDataUrls.filter(Boolean).length;
+    if (capturedCount < imageUrls.length) return;
+
+    // Clear existing previews so they regenerate with new allCaps setting
+    setExportPreviewUrl(null);
+    setBookletPreviewUrl(null);
+  }, [allCaps]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!story || imageUrls.length === 0) return;
@@ -219,9 +236,9 @@ function App() {
 
   // Save user settings to localStorage when they change
   useEffect(() => {
-    const settings: UserSettings = { maxLetters, model, imageModel };
+    const settings: UserSettings = { maxLetters, model, imageModel, allCaps };
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  }, [maxLetters, model, imageModel]);
+  }, [maxLetters, model, imageModel, allCaps]);
 
   // Save stories to localStorage
   const saveStory = useCallback((newStory: Story) => {
@@ -542,12 +559,14 @@ function App() {
                 imageUrls={imageUrls}
                 loadedImages={loadedImages}
                 isGeneratingImage={isGeneratingImage}
+                allCaps={allCaps}
                 onImageLoad={handleImageLoad}
                 onImageError={handleImageError}
                 onDownloadImage={downloadAsImage}
                 onGenerateAnother={generateStory}
                 onOpenReadingMode={openReadingMode}
                 onPrintMiniBook={downloadMiniBook}
+                onAllCapsChange={setAllCaps}
               />
             )}
           </AnimatePresence>
@@ -581,6 +600,7 @@ function App() {
               imageUrls={imageUrls}
               segments={exportSegments}
               currentIndex={readingModeIndex}
+              allCaps={allCaps}
               onIndexChange={setReadingModeIndex}
               onClose={() => setShowReadingMode(false)}
             />

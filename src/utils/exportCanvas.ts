@@ -5,6 +5,7 @@ type ExportCanvasOptions = {
   imageUrls: string[];
   imageDataUrls: string[];
   topic: string;
+  allCaps?: boolean;
 };
 
 const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> => {
@@ -48,8 +49,10 @@ export const renderExportCanvas = async ({
   imageUrls,
   imageDataUrls,
   topic,
+  allCaps = false,
 }: ExportCanvasOptions): Promise<HTMLCanvasElement> => {
-  const segments = splitStoryIntoSegments(story, Math.max(imageUrls.length, 1));
+  const rawSegments = splitStoryIntoSegments(story, Math.max(imageUrls.length, 1));
+  const segments = allCaps ? rawSegments.map((s) => s.toUpperCase()) : rawSegments;
   const items = imageUrls.map((_, index) => ({
     dataUrl: imageDataUrls[index],
     segment: segments[index] || "",

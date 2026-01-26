@@ -6,12 +6,14 @@ type ReadingModeModalProps = {
   imageUrls: string[];
   segments: string[];
   currentIndex: number;
+  allCaps: boolean;
   onIndexChange: (index: number) => void;
   onClose: () => void;
 };
 
-const renderStoryText = (text: string) => {
-  return text.split(/(\s+)/).map((word, index) => {
+const renderStoryText = (text: string, allCaps: boolean) => {
+  const displayText = allCaps ? text.toUpperCase() : text;
+  return displayText.split(/(\s+)/).map((word, index) => {
     if (word.trim() === "") {
       return <span key={index}>{word}</span>;
     }
@@ -27,6 +29,7 @@ export default function ReadingModeModal({
   imageUrls,
   segments,
   currentIndex,
+  allCaps,
   onIndexChange,
   onClose,
 }: ReadingModeModalProps) {
@@ -127,7 +130,7 @@ export default function ReadingModeModal({
               {segments[currentIndex] && (
                 <div className="w-full max-w-2xl text-center px-4">
                   <p className="text-2xl md:text-3xl lg:text-4xl leading-relaxed text-gray-800 font-lexend font-semibold reading-mode-text">
-                    {renderStoryText(segments[currentIndex])}
+                    {renderStoryText(segments[currentIndex], allCaps)}
                   </p>
                 </div>
               )}
