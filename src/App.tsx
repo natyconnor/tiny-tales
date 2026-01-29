@@ -3,10 +3,13 @@ import {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
   type SyntheticEvent,
 } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Wand2 } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 import AppHeader from "./components/AppHeader";
 import ExportPrintContainer from "./components/ExportPrintContainer";
 import BookletPrintContainer from "./components/BookletPrintContainer";
@@ -25,6 +28,7 @@ import {
   POST_STORY_ONBOARDING_KEY,
 } from "./hooks/useOnboarding";
 import ReadingModeModal from "./components/ReadingModeModal";
+import ShareModal from "./components/ShareModal";
 import StoryDisplay from "./components/StoryDisplay";
 import StoryForm from "./components/StoryForm";
 import {
@@ -70,6 +74,20 @@ function loadSettings(): UserSettings {
 
 function App() {
   const initialSettings = loadSettings();
+
+  // Extract share ID from URL if present
+  const shareId = useMemo(() => {
+    const match = window.location.pathname.match(/^\/s\/([a-zA-Z0-9_-]+)$/);
+    return match ? match[1] : null;
+  }, []);
+
+  // Convex hooks
+  const shareStoryMutation = useMutation(api.stories.share);
+  const sharedStory = useQuery(
+    api.stories.getByShortId,
+    shareId ? { shortId: shareId } : "skip"
+  );
+
   const [topic, setTopic] = useState("");
   const [title, setTitle] = useState("");
   const [maxLetters, setMaxLetters] = useState(initialSettings.maxLetters);
@@ -93,6 +111,10 @@ function App() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showReadingMode, setShowReadingMode] = useState(false);
   const [readingModeIndex, setReadingModeIndex] = useState(0);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
   const { showOnboarding, completeOnboarding } = useOnboarding();
@@ -240,6 +262,36 @@ function App() {
     const settings: UserSettings = { maxLetters, model, imageModel, allCaps };
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   }, [maxLetters, model, imageModel, allCaps]);
+
+  // Load shared story from Convex when query resolves
+  useEffect(() => {
+    if (!shareId) return;
+
+    // Query is still loading
+    if (sharedStory === undefined) {
+      setIsLoadingShared(true);
+      return;
+    }
+
+    setIsLoadingShared(false);
+
+    // Story not found
+    if (sharedStory === null) {
+      setError("This story link has expired or doesn't exist.");
+      return;
+    }
+
+    // Populate state with shared story
+    setTopic(sharedStory.topic);
+    setTitle(sharedStory.title || sharedStory.topic);
+    setMaxLetters(sharedStory.maxLetters);
+    setStory(sharedStory.content);
+    setImageUrls(sharedStory.imageUrls || []);
+    setLoadedImages(new Array(sharedStory.imageUrls?.length || 0).fill(false));
+    setImageDataUrls([]);
+    setExportPreviewUrl(null);
+    setBookletPreviewUrl(null);
+  }, [shareId, sharedStory]);
 
   // Save stories to localStorage
   const saveStory = useCallback((newStory: Story) => {
@@ -415,6 +467,34 @@ function App() {
     }
   };
 
+  const shareStory = async () => {
+    if (!story) return;
+
+    setIsSharing(true);
+    try {
+      const { shortId } = await shareStoryMutation({
+        topic,
+        title: title || topic,
+        content: story,
+        maxLetters,
+        imageUrls,
+      });
+
+      const url = `${window.location.origin}/s/${shortId}`;
+      setShareUrl(url);
+      setShowShareModal(true);
+    } catch (err) {
+      console.error("Share error:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to create share link. Please try again."
+      );
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   const openReadingMode = () => {
     setReadingModeIndex(0);
     setShowReadingMode(true);
@@ -523,7 +603,7 @@ function App() {
           </AnimatePresence>
 
           <AnimatePresence mode="wait">
-            {isLoading && (
+            {(isLoading || isLoadingShared) && (
               <motion.div
                 key="loading"
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -539,10 +619,15 @@ function App() {
                   </div>
                   <div className="text-left">
                     <p className="text-xl font-bold text-gray-700 font-comic">
-                      Crafting your story...
+                      {isLoadingShared
+                        ? "Loading shared story..."
+                        : "Crafting your story..."}
                     </p>
                     <p className="text-gray-500 font-lexend">
-                      Our wizard is writing something special! ✨
+                      {isLoadingShared
+                        ? "Just a moment!"
+                        : "Our wizard is writing something special!"}{" "}
+                      ✨
                     </p>
                   </div>
                 </div>
@@ -561,6 +646,7 @@ function App() {
                 imageUrls={imageUrls}
                 loadedImages={loadedImages}
                 isGeneratingImage={isGeneratingImage}
+                isSharing={isSharing}
                 allCaps={allCaps}
                 onImageLoad={handleImageLoad}
                 onImageError={handleImageError}
@@ -568,6 +654,7 @@ function App() {
                 onGenerateAnother={generateStory}
                 onOpenReadingMode={openReadingMode}
                 onPrintMiniBook={downloadMiniBook}
+                onShare={shareStory}
                 onAllCapsChange={setAllCaps}
               />
             )}
@@ -592,6 +679,15 @@ function App() {
               previewUrl={exportPreviewUrl}
               fileName={exportFileName}
               onClose={() => setShowExportModal(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showShareModal && shareUrl && (
+            <ShareModal
+              shareUrl={shareUrl}
+              onClose={() => setShowShareModal(false)}
             />
           )}
         </AnimatePresence>

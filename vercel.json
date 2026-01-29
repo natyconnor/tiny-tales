@@ -11,6 +11,10 @@
     {
       "source": "/api/:path*",
       "destination": "/api/:path*"
+    },
+    {
+      "source": "/s/:id",
+      "destination": "/index.html"
     }
   ]
 }

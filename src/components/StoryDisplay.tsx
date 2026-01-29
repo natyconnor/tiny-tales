@@ -1,6 +1,13 @@
 import type { SyntheticEvent } from "react";
 import { motion } from "motion/react";
-import { Download, RotateCcw, BookOpen, Printer, CaseSensitive } from "lucide-react";
+import {
+  Download,
+  RotateCcw,
+  BookOpen,
+  Printer,
+  CaseSensitive,
+  Share2,
+} from "lucide-react";
 
 import { splitStoryIntoSegments } from "../utils/storySegments";
 import Tooltip from "./Tooltip";
@@ -11,6 +18,7 @@ type StoryDisplayProps = {
   imageUrls: string[];
   loadedImages: boolean[];
   isGeneratingImage: boolean;
+  isSharing: boolean;
   allCaps: boolean;
   onImageLoad: (index: number, event: SyntheticEvent<HTMLImageElement>) => void;
   onImageError: (index: number, url: string) => void;
@@ -18,6 +26,7 @@ type StoryDisplayProps = {
   onGenerateAnother: () => void;
   onOpenReadingMode: () => void;
   onPrintMiniBook: () => void;
+  onShare: () => void;
   onAllCapsChange: (value: boolean) => void;
 };
 
@@ -41,6 +50,7 @@ export default function StoryDisplay({
   imageUrls,
   loadedImages,
   isGeneratingImage,
+  isSharing,
   allCaps,
   onImageLoad,
   onImageError,
@@ -48,6 +58,7 @@ export default function StoryDisplay({
   onGenerateAnother,
   onOpenReadingMode,
   onPrintMiniBook,
+  onShare,
   onAllCapsChange,
 }: StoryDisplayProps) {
   const segments = splitStoryIntoSegments(story, Math.max(imageUrls.length, 1));
@@ -123,7 +134,9 @@ export default function StoryDisplay({
               )}
             </motion.button>
           </Tooltip>
-          <Tooltip text={allCaps ? "Switch to normal case" : "Switch to ALL CAPS"}>
+          <Tooltip
+            text={allCaps ? "Switch to normal case" : "Switch to ALL CAPS"}
+          >
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -134,7 +147,26 @@ export default function StoryDisplay({
                   : "bg-violet-100 hover:bg-violet-200"
               }`}
             >
-              <CaseSensitive className={`w-5 h-5 ${allCaps ? "text-violet-700" : "text-violet-600"}`} />
+              <CaseSensitive
+                className={`w-5 h-5 ${
+                  allCaps ? "text-violet-700" : "text-violet-600"
+                }`}
+              />
+            </motion.button>
+          </Tooltip>
+          <Tooltip text="Share Story - Get a shareable link">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onShare}
+              disabled={isSharing}
+              className="p-2 bg-green-100 hover:bg-green-200 rounded-full transition-colors disabled:opacity-50"
+            >
+              {isSharing ? (
+                <div className="w-5 h-5 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
+              ) : (
+                <Share2 className="w-5 h-5 text-green-600" />
+              )}
             </motion.button>
           </Tooltip>
         </div>
