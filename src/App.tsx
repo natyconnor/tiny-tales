@@ -739,6 +739,16 @@ function App() {
           className="text-center mt-12 text-gray-500 font-lexend no-print"
         >
           <p>Made with ❤️ for little readers everywhere</p>
+          <p className="mt-2">
+            <a
+              href="https://github.com/natyconnor/tiny-tales"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-pink-500 transition-colors underline underline-offset-2"
+            >
+              View on GitHub
+            </a>
+          </p>
         </motion.footer>
       </div>
     </div>
