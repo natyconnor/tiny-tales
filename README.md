@@ -9,122 +9,99 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 - **📝 Custom Topics**: Enter any topic for your story (brave cats, magical forests, funny robots...)
 - **📏 Word Length Control**: Slider to set maximum letters per word (3-8 letters)
 - **🎨 Kid-Friendly UI**: Colorful, playful design with dyslexia-friendly fonts
-- **🔊 Read Aloud**: Built-in text-to-speech for story narration
 - **🖨️ Print Stories**: Export and print stories for offline reading
 - **📚 Story History**: Automatically saves recent stories to localStorage
 - **✨ Word Highlighting**: Hover over words for interactive reading practice
-- **📱 Mobile Responsive**: Works great on tablets and phones
+- **🔗 Share Stories**: Share your favorite tales with others without needing a login
 
 ## 🚀 Getting Started
 
-### Installation
+### Prerequisites
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/tiny-tales.git
-cd tiny-tales
-```
+- Node.js 18+
+- [pnpm](https://pnpm.io/) (or npm/yarn)
 
-2. Install dependencies (use your preferred package manager):
-```bash
-npm install
-# or: yarn install
-# or: pnpm install
-```
+### Quick Start
 
-3. Create a `.env.local` file in the root directory with your API keys:
-```env
-# For AI story generation (pick one or both):
-GEMINI_API_KEY=your_google_gemini_api_key_here
-POLLINATIONS_API_KEY=your_pollinations_api_key_here
+1. **Clone and install**
+   ```bash
+   git clone https://github.com/yourusername/tiny-tales.git
+   cd tiny-tales
+   pnpm install
+   ```
 
-# Optional: Convex backend (if using story persistence)
-# VITE_CONVEX_URL=your_convex_deployment_url
-```
+2. **Set up Convex** (required for the app)
+   ```bash
+   npx convex dev
+   ```
+   This creates a Convex project, deploys the schema, and adds `VITE_CONVEX_URL` to `.env.local`. Keep this running in one terminal.
 
-4. Start the development servers:
-```bash
-# Option 1: Run both frontend and API server together (recommended)
-npm run dev:all
-# or: yarn dev:all / pnpm dev:all
+3. **Add API keys** (optional but recommended)
 
-# Option 2: Run them separately in different terminals
-npm run dev:api    # API server on http://localhost:3001
-npm run dev        # Frontend on http://localhost:5173
-```
+   Edit `.env.local` and add:
+   ```env
+   # Pollinations API for AI text + image generation
+   POLLINATIONS_API_KEY=your_pollinations_api_key_here
+   ```
+   Get a key at [Pollinations](https://pollinations.ai/).
 
-5. Open [http://localhost:5173](http://localhost:5173) in your browser
+4. **Start the app** (in a second terminal)
+   ```bash
+   pnpm dev:all
+   ```
+   Open [http://localhost:5173](http://localhost:5173). The API server runs on port 3001; Vite proxies `/api/*` to it.
 
-### Local Development Notes
+### Development Notes
 
-- The API server runs on port 3001 by default (configurable via `API_PORT` env variable)
-- Vite automatically proxies `/api/*` requests to the local API server
-- Make sure both servers are running when testing API calls locally
+- **Terminals**: You need `npx convex dev` (Convex backend) and `pnpm dev:all` (frontend + API) running
+- **Alternative**: Run `pnpm dev:api` and `pnpm dev` separately if you prefer
+- **API port**: Override with `API_PORT` env variable
+
 
 ## 🌐 Deployment
 
-The project is configured for deployment on **Vercel** (see `vercel.json`). To deploy:
+Deploy to **Vercel** (configured via `vercel.json`):
 
-1. Push your code to GitHub
-2. Import the project in [Vercel](https://vercel.com)
-3. Add environment variables in the Vercel dashboard:
-   - `GEMINI_API_KEY`: Your Google Gemini API key (required)
-   - `POLLINATIONS_API_KEY`: Optional, for Pollinations API
-4. Deploy — Vercel will automatically build and deploy
+1. Push to GitHub and import the project in [Vercel](https://vercel.com)
+2. Add environment variables:
+   - `VITE_CONVEX_URL` — from your Convex dashboard (deploy with `npx convex deploy`)
+   - `POLLINATIONS_API_KEY` — for AI generation
+3. Deploy; Vercel builds the frontend and runs the API serverless function
 
-You can deploy to other platforms as well; the app is a standard Vite + React build with an API directory for serverless functions.
+Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS with custom animations
-- **AI**: Pollinations API to use AI models for both text and image generation
-- **Icons**: Lucide React
-- **Production deployment**: Vercel (pnpm, serverless functions)
+- **Frontend**: React 18, TypeScript, Vite
+- **Styling**: Tailwind CSS
+- **AI**: Pollinations API (text + images); optional Gemini fallback
+- **Backend**: Convex (story sharing)
+- **Deployment**: Vercel
+- **Storage**: Convex
 
 ## 📁 Project Structure
 
 ```
 tiny-tales/
 ├── api/
-│   └── generate.ts      # Vercel serverless function for Gemini API
-├── public/
-│   └── favicon.svg      # App favicon
+│   └── generate.ts      # Vercel serverless function (Pollinations/Gemini)
+├── convex/
+│   ├── schema.ts        # Shared stories schema
+│   └── stories.ts       # Share & fetch mutations/queries
 ├── src/
-│   ├── App.tsx          # Main application component
-│   ├── main.tsx         # React entry point
-│   └── index.css        # Tailwind & custom styles
-├── server.ts            # Local development API server
-├── index.html           # HTML template
-├── package.json
-├── tailwind.config.js
-├── tsconfig.json
-├── vercel.json          # Vercel configuration
-└── vite.config.ts       # Vite config with API proxy
+│   ├── components/      # UI components
+│   ├── App.tsx
+│   └── main.tsx
+├── server.ts            # Local dev API server
+├── vercel.json          # Vercel config + rewrites
+└── vite.config.ts       # Vite config + API proxy
 ```
 
 ## 🎯 How It Works
 
-1. **Enter a Topic**: Type what you want the story to be about
-2. **Set Word Length**: Use the slider to limit maximum letters per word
-3. **Generate**: Click the magic button to create your story
-4. **Read & Learn**: Hover over words, read aloud, or print the story
-
-## 🔒 Security
-
-- API keys are stored securely as environment variables (never committed)
-- All AI API calls go through the backend/serverless layer — no keys are exposed to the client
-
-## 📜 License
-
-MIT License - feel free to use this for educational purposes!
-
-## 🙏 Acknowledgments
-
-- Google Gemini for the AI magic
-- Lexend font for improved readability
-- All the little readers who inspire us to create
-
----
+1. **Enter a topic** — What should the story be about?
+2. **Set word length** — Slider for max letters per word (3–8)
+3. **Generate** — AI creates a story and 4 illustrations
+4. **Read & share** — Hover words, print, or share via link
 
 Made with ❤️ for little readers everywhere
