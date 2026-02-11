@@ -739,7 +739,7 @@ function App() {
           className="text-center mt-12 text-gray-500 font-lexend no-print"
         >
           <p>Made with ❤️ for little readers everywhere</p>
-          <p className="mt-2">
+          <p className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <a
               href="https://github.com/natyconnor/tiny-tales"
               target="_blank"
@@ -747,6 +747,15 @@ function App() {
               className="text-gray-400 hover:text-pink-500 transition-colors underline underline-offset-2"
             >
               View on GitHub
+            </a>
+            <span className="text-gray-300">·</span>
+            <a
+              href="https://nathanconnor.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-pink-500 transition-colors underline underline-offset-2"
+            >
+              Check out my other work
             </a>
           </p>
         </motion.footer>
