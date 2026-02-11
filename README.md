@@ -17,12 +17,6 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 
 ## 🚀 Getting Started
 
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- A Google Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
-
 ### Installation
 
 1. Clone the repository:
@@ -31,25 +25,32 @@ git clone https://github.com/yourusername/tiny-tales.git
 cd tiny-tales
 ```
 
-2. Install dependencies:
+2. Install dependencies (use your preferred package manager):
 ```bash
-pnpm install
+npm install
+# or: yarn install
+# or: pnpm install
 ```
 
-3. Create a `.env.local` file in the root directory:
+3. Create a `.env.local` file in the root directory with your API keys:
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
-POLLINATIONS_API_KEY=your_pollinations_api_key_here  # Optional
+# For AI story generation (pick one or both):
+GEMINI_API_KEY=your_google_gemini_api_key_here
+POLLINATIONS_API_KEY=your_pollinations_api_key_here
+
+# Optional: Convex backend (if using story persistence)
+# VITE_CONVEX_URL=your_convex_deployment_url
 ```
 
 4. Start the development servers:
 ```bash
 # Option 1: Run both frontend and API server together (recommended)
-pnpm dev:all
+npm run dev:all
+# or: yarn dev:all / pnpm dev:all
 
 # Option 2: Run them separately in different terminals
-pnpm dev:api    # API server on http://localhost:3001
-pnpm dev        # Frontend on http://localhost:5173
+npm run dev:api    # API server on http://localhost:3001
+npm run dev        # Frontend on http://localhost:5173
 ```
 
 5. Open [http://localhost:5173](http://localhost:5173) in your browser
@@ -58,27 +59,28 @@ pnpm dev        # Frontend on http://localhost:5173
 
 - The API server runs on port 3001 by default (configurable via `API_PORT` env variable)
 - Vite automatically proxies `/api/*` requests to the local API server
-- In production, API calls go directly to Vercel serverless functions
 - Make sure both servers are running when testing API calls locally
 
-## 🌐 Deployment to Vercel
+## 🌐 Deployment
+
+The project is configured for deployment on **Vercel** (see `vercel.json`). To deploy:
 
 1. Push your code to GitHub
-
 2. Import the project in [Vercel](https://vercel.com)
+3. Add environment variables in the Vercel dashboard:
+   - `GEMINI_API_KEY`: Your Google Gemini API key (required)
+   - `POLLINATIONS_API_KEY`: Optional, for Pollinations API
+4. Deploy — Vercel will automatically build and deploy
 
-3. Add the environment variable:
-   - `GEMINI_API_KEY`: Your Google Gemini API key
-
-4. Deploy! Vercel will automatically build and deploy your app
+You can deploy to other platforms as well; the app is a standard Vite + React build with an API directory for serverless functions.
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 18 + TypeScript + Vite
 - **Styling**: Tailwind CSS with custom animations
-- **AI**: Google Gemini 1.5 Flash API
+- **AI**: Pollinations API to use AI models for both text and image generation
 - **Icons**: Lucide React
-- **Hosting**: Vercel (with Edge Functions)
+- **Production deployment**: Vercel (pnpm, serverless functions)
 
 ## 📁 Project Structure
 
@@ -110,9 +112,8 @@ tiny-tales/
 
 ## 🔒 Security
 
-- API keys are stored securely as environment variables
-- All API calls go through Vercel Edge Functions
-- No sensitive data is exposed to the client
+- API keys are stored securely as environment variables (never committed)
+- All AI API calls go through the backend/serverless layer — no keys are exposed to the client
 
 ## 📜 License
 
