@@ -74,7 +74,7 @@ Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.
 
 - **Frontend**: React 18, TypeScript, Vite
 - **Styling**: Tailwind CSS
-- **AI**: Pollinations API (text + images); optional Gemini fallback
+- **AI**: Pollinations API (text + images)
 - **Backend**: Convex (story sharing)
 - **Deployment**: Vercel
 - **Storage**: Convex
@@ -84,7 +84,7 @@ Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.
 ```
 tiny-tales/
 ├── api/
-│   └── generate.ts      # Vercel serverless function (Pollinations/Gemini)
+│   └── generate.ts      # Vercel serverless function (Pollinations)
 ├── convex/
 │   ├── schema.ts        # Shared stories schema
 │   └── stories.ts       # Share & fetch mutations/queries

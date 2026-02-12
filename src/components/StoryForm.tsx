@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { History, Sparkles, Wand2, Lightbulb } from "lucide-react";
 
 import {
-  AVAILABLE_MODELS,
-  IMAGE_MODELS,
   LETTER_LABELS,
+  type ModelOption,
   PROMPT_IDEAS,
 } from "../constants/story";
 
@@ -14,6 +13,8 @@ type StoryFormProps = {
   maxLetters: number;
   model: string;
   imageModel: string;
+  availableModels: ModelOption[];
+  availableImageModels: ModelOption[];
   isLoading: boolean;
   savedStoriesCount: number;
   inputRef: RefObject<HTMLInputElement>;
@@ -30,6 +31,8 @@ export default function StoryForm({
   maxLetters,
   model,
   imageModel,
+  availableModels,
+  availableImageModels,
   isLoading,
   savedStoriesCount,
   inputRef,
@@ -222,7 +225,7 @@ export default function StoryForm({
           disabled={isLoading}
           className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
-          {AVAILABLE_MODELS.map((item) => (
+          {availableModels.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name} — {item.description}
             </option>
@@ -247,7 +250,7 @@ export default function StoryForm({
           disabled={isLoading}
           className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-fuchsia-500 focus:ring-4 focus:ring-fuchsia-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
-          {IMAGE_MODELS.map((item) => (
+          {availableImageModels.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name} — {item.description}
             </option>

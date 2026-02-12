@@ -1,4 +1,4 @@
-import { IMAGE_MODELS } from "../constants/story";
+import { DEFAULT_IMAGE_MODELS } from "../constants/story";
 
 // Helper function to extract image model from a Pollinations URL
 export const extractImageModelFromUrl = (url: string): string | null => {
@@ -13,6 +13,6 @@ export const extractImageModelFromUrl = (url: string): string | null => {
 // Helper function to get display name for image model
 export const getImageModelDisplayName = (modelId: string | null): string => {
   if (!modelId) return "Unknown";
-  const model = IMAGE_MODELS.find((item) => item.id === modelId);
+  const model = DEFAULT_IMAGE_MODELS.find((item) => item.id === modelId);
   return model ? model.name : modelId;
 };

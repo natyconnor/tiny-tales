@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import handler from "./api/generate";
+import generateHandler from "./api/generate";
+import modelsHandler from "./api/models";
 import * as dotenv from "dotenv";
 
 // Load environment variables from .env.local or .env
@@ -9,13 +10,21 @@ dotenv.config({ path: ".env" });
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
+type VercelHandler = (
+  req: Parameters<typeof generateHandler>[0],
+  res: Parameters<typeof generateHandler>[1]
+) => Promise<void> | void;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // Convert Express request/response to Vercel format
-app.post("/api/generate", async (req, res) => {
+const runVercelHandler = async (
+  req: express.Request,
+  res: express.Response,
+  handler: VercelHandler
+) => {
   // Create a Vercel-compatible request object
   const vercelReq = {
     method: req.method,
@@ -59,18 +68,20 @@ app.post("/api/generate", async (req, res) => {
       });
     }
   }
+};
+
+app.post("/api/generate", async (req, res) => {
+  await runVercelHandler(req, res, generateHandler);
+});
+
+app.get("/api/models", async (req, res) => {
+  await runVercelHandler(req, res, modelsHandler);
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 Local API server running on http://localhost:${PORT}`);
   console.log(`📡 API endpoint: http://localhost:${PORT}/api/generate`);
-  console.log(
-    `🔑 GEMINI_API_KEY: ${
-      process.env.GEMINI_API_KEY
-        ? `${process.env.GEMINI_API_KEY.slice(0, 8)}...`
-        : "NOT SET"
-    }`
-  );
+  console.log(`🧠 Model endpoint: http://localhost:${PORT}/api/models`);
   console.log(
     `🎨 POLLINATIONS_API_KEY: ${
       process.env.POLLINATIONS_API_KEY

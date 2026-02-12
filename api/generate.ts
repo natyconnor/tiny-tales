@@ -1,5 +1,9 @@
-import { GoogleGenAI } from "@google/genai";
 import type { IncomingMessage, ServerResponse } from "http";
+import {
+  DEFAULT_IMAGE_MODELS,
+  DEFAULT_TEXT_MODELS,
+  getCuratedModelCatalog,
+} from "./pollinationsCatalog";
 
 // Vercel serverless types
 interface VercelRequest extends IncomingMessage {
@@ -20,49 +24,6 @@ interface RequestBody {
   imageModel?: string;
 }
 
-// Pollinations text models (OpenAI-compatible endpoint)
-// See: https://gen.pollinations.ai/v1/models
-const ALLOWED_MODELS = [
-  "gemini-fast", // Gemini 2.5 Flash Lite - fastest
-  "deepseek", // DeepSeek V3.2 - best reasoning
-  "openai", // GPT-5 Mini - balanced
-  "gemini", // Gemini 3 Flash - newest
-];
-
-// Gemini fallback models (when USE_GEMINI_FALLBACK is set)
-const GEMINI_FALLBACK_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-3-flash-preview",
-];
-
-// Map Pollinations model IDs to Gemini model IDs for fallback
-const POLLINATIONS_TO_GEMINI_MAP: Record<string, string> = {
-  "gemini-fast": "gemini-2.5-flash-lite",
-  deepseek: "gemini-2.5-flash",
-  openai: "gemini-2.5-flash",
-  gemini: "gemini-3-flash-preview",
-};
-
-// Allowed Pollinations image models
-// See: https://gen.pollinations.ai/image/models
-// Pollen rates (images per 1 pollen / pollen per image):
-//   flux:          5000 images/pollen = 0.0002 pollen/image
-//   turbo:         3300 images/pollen = 0.0003 pollen/image
-//   gptimage:      70 images/pollen   = 0.0143 pollen/image
-//   seedream:      35 images/pollen   = 0.0286 pollen/image
-//   nanobanana:    25 images/pollen   = 0.04 pollen/image
-//   nanobanana-pro:6 images/pollen    = 0.167 pollen/image
-// Each story uses 4 images
-const ALLOWED_IMAGE_MODELS = [
-  "flux", // Flux Schnell - 5K images/pollen (essentially unlimited)
-  "nanobanana", // NanoBanana - 25 images/pollen
-  "gptimage", // OpenAI GPT Image 1 Mini - 70 images/pollen
-  "seedream", // ByteDance Seedream 4.0 - 35 images/pollen
-  "turbo", // SDXL Turbo - 3.3K images/pollen (essentially unlimited)
-  "nanobanana-pro", // NanoBanana Pro - 6 images/pollen (expensive!)
-];
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = Date.now();
   const log = (msg: string) =>
@@ -75,28 +36,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Check if we should use Gemini fallback
-  const useGeminiFallback = process.env.USE_GEMINI_FALLBACK === "true";
-  log(
-    `Using ${useGeminiFallback ? "Gemini fallback" : "Pollinations"} for text`
-  );
+  log("Using Pollinations for text");
 
-  // Get appropriate API key
+  // Optional Pollinations API key
   const pollinationsKey = process.env.POLLINATIONS_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  if (useGeminiFallback && !geminiKey) {
-    log("ERROR: GEMINI_API_KEY is not set for fallback mode");
-    return res.status(500).json({
-      error: "Server configuration error: Gemini API key not set",
-    });
-  }
 
   if (pollinationsKey) {
     log(`Pollinations key found: ${pollinationsKey.slice(0, 8)}...`);
-  }
-  if (geminiKey) {
-    log(`Gemini key found: ${geminiKey.slice(0, 8)}...`);
   }
 
   try {
@@ -123,30 +69,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .json({ error: "Maximum letters must be between 3 and 8" });
     }
 
-    // Determine which model to use
-    let modelName: string;
-    if (useGeminiFallback) {
-      // Map Pollinations model to Gemini equivalent, or use directly if it's a Gemini model
-      const mappedModel = POLLINATIONS_TO_GEMINI_MAP[requestedModel ?? ""];
-      modelName =
-        mappedModel ||
-        (requestedModel && GEMINI_FALLBACK_MODELS.includes(requestedModel)
-          ? requestedModel
-          : "gemini-2.5-flash-lite");
-    } else {
-      // Use Pollinations model directly
-      modelName =
-        requestedModel && ALLOWED_MODELS.includes(requestedModel)
-          ? requestedModel
-          : "gemini-fast";
-    }
+    const curatedCatalog = await getCuratedModelCatalog();
+    const allowedTextModels = curatedCatalog.textModels.map((item) => item.id);
+    const allowedImageModels = curatedCatalog.imageModels.map((item) => item.id);
+    const defaultTextModel = allowedTextModels[0] ?? DEFAULT_TEXT_MODELS[0].id;
+    const defaultImageModel =
+      allowedImageModels[0] ?? DEFAULT_IMAGE_MODELS[0].id;
+
+    const requestedTextModel =
+      requestedModel && allowedTextModels.includes(requestedModel)
+        ? requestedModel
+        : defaultTextModel;
+
+    const requestedImageModelId =
+      requestedImageModel && allowedImageModels.includes(requestedImageModel)
+        ? requestedImageModel
+        : defaultImageModel;
+
+    // Use Pollinations model directly
+    const modelName = requestedTextModel;
     log(`Using text model: ${modelName}`);
 
-    // Use requested image model if valid, otherwise default to flux
-    const imageModelName =
-      requestedImageModel && ALLOWED_IMAGE_MODELS.includes(requestedImageModel)
-        ? requestedImageModel
-        : "flux";
+    // Use requested image model if valid, otherwise default to curated best-value option
+    const imageModelName = requestedImageModelId;
     log(`Using image model: ${imageModelName}`);
 
     // Get skill-level-specific guidance
@@ -245,60 +190,44 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 }`;
 
     // Generate the story and image prompts
-    let responseText: string;
-
-    if (useGeminiFallback) {
-      // Use Gemini API directly
-      log("Calling Gemini API...");
-      const ai = new GoogleGenAI({ apiKey: geminiKey! });
-      const result = await ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-      });
-      log("Gemini API responded");
-      responseText = result.text?.trim() ?? "";
-    } else {
-      // Use Pollinations OpenAI-compatible API
-      log("Calling Pollinations API...");
-      const pollinationsResponse = await fetch(
-        "https://gen.pollinations.ai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(pollinationsKey && {
-              Authorization: `Bearer ${pollinationsKey}`,
-            }),
-          },
-          body: JSON.stringify({
-            model: modelName,
-            messages: [
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
+    // Use Pollinations OpenAI-compatible API
+    log("Calling Pollinations API...");
+    const pollinationsResponse = await fetch(
+      "https://gen.pollinations.ai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(pollinationsKey && {
+            Authorization: `Bearer ${pollinationsKey}`,
           }),
-        }
-      );
-
-      if (!pollinationsResponse.ok) {
-        const errorText = await pollinationsResponse.text();
-        log(
-          `Pollinations API error: ${pollinationsResponse.status} - ${errorText}`
-        );
-        throw new Error(
-          `Pollinations API error: ${pollinationsResponse.status}`
-        );
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        }),
       }
+    );
 
-      const pollinationsData = (await pollinationsResponse.json()) as {
-        choices: Array<{ message: { content: string } }>;
-      };
-      log("Pollinations API responded");
-      responseText =
-        pollinationsData.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!pollinationsResponse.ok) {
+      const errorText = await pollinationsResponse.text();
+      log(
+        `Pollinations API error: ${pollinationsResponse.status} - ${errorText}`
+      );
+      throw new Error(`Pollinations API error: ${pollinationsResponse.status}`);
     }
+
+    const pollinationsData = (await pollinationsResponse.json()) as {
+      choices: Array<{ message: { content: string } }>;
+    };
+    log("Pollinations API responded");
+    const responseText =
+      pollinationsData.choices?.[0]?.message?.content?.trim() ?? "";
     log(`Response received: ${responseText.length} chars`);
 
     // Parse the JSON response
@@ -376,7 +305,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
         time: Date.now() - startTime,
         model: modelName,
         imageModel: imageModelName,
-        textApi: useGeminiFallback ? "gemini" : "pollinations",
+        textApi: "pollinations",
         pollinationsKeyConfigured: !!pollinationsKey,
       },
     });

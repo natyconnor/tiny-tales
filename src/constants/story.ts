@@ -2,66 +2,53 @@ export const STORAGE_KEY = "tiny-tales-stories";
 export const SETTINGS_STORAGE_KEY = "tiny-tales-settings";
 export const MAX_STORED_STORIES = 50;
 
-// Available Pollinations text models
-// See: https://gen.pollinations.ai/v1/models
-// Using OpenAI-compatible endpoint at /v1/chat/completions
-export const AVAILABLE_MODELS = [
+export type ModelOption = {
+  id: string;
+  name: string;
+  description: string;
+  paidOnly?: boolean;
+};
+
+// Dynamic models are loaded from /api/models at runtime.
+// These are safe fallbacks if API discovery fails.
+export const DEFAULT_AVAILABLE_MODELS: ModelOption[] = [
   {
-    id: "gemini-fast",
-    name: "Gemini 2.5 Flash Lite",
-    description: "Fastest ⚡",
-  },
-  {
-    id: "deepseek",
-    name: "DeepSeek V3.2",
-    description: "Best reasoning 🧠",
+    id: "openai-fast",
+    name: "GPT-5 Nano",
+    description: "Fastest and cheapest",
   },
   {
     id: "openai",
     name: "GPT-5 Mini",
-    description: "Slow 🐢",
+    description: "Balanced quality and speed",
   },
   {
-    id: "gemini",
-    name: "Gemini 3 Flash",
-    description: "Newest 🚀",
+    id: "deepseek",
+    name: "DeepSeek V3.2",
+    description: "Alternative reasoning style",
+  },
+  {
+    id: "openai-large",
+    name: "GPT-5.2",
+    description: "Highest quality writing",
   },
 ];
 
-// Available Pollinations image models
-// See: https://gen.pollinations.ai/image/models
-// Pollen rates from API docs (images per 1 pollen):
-//   flux:          5000 images/pollen (essentially unlimited)
-//   turbo:         3300 images/pollen (essentially unlimited)
-//   gptimage:      70 images/pollen   (~17 stories/day with 1 pollen)
-//   nanobanana:    25 images/pollen   (~6 stories/day with 1 pollen)
-//   nanobanana-pro:6 images/pollen    (~1 story/day with 1 pollen)
-// Each story uses 4 images
-export const IMAGE_MODELS = [
+export const DEFAULT_IMAGE_MODELS: ModelOption[] = [
   {
     id: "gptimage",
-    name: "GPT Image",
-    description: "Balanced speed and quality (~17/day)",
+    name: "GPT Image 1 Mini",
+    description: "Best value image quality",
   },
   {
-    id: "nanobanana",
-    name: "Nano Banana 🍌",
-    description: "Excellent quality (~6/day)",
+    id: "klein",
+    name: "FLUX.2 Klein 4B",
+    description: "Balanced quality and price",
   },
   {
-    id: "flux",
-    name: "Flux Schnell",
-    description: "Fast & free (but might have some issues)",
-  },
-  {
-    id: "turbo",
-    name: "SDXL Turbo",
-    description: "Free with good quality",
-  },
-  {
-    id: "nanobanana-pro",
-    name: "Nano Banana Pro",
-    description: "Best quality (~1/day)",
+    id: "klein-large",
+    name: "FLUX.2 Klein 9B",
+    description: "Higher quality option",
   },
 ];
 

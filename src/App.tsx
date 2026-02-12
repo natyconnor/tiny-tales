@@ -32,9 +32,12 @@ import ShareModal from "./components/ShareModal";
 import StoryDisplay from "./components/StoryDisplay";
 import StoryForm from "./components/StoryForm";
 import {
+  DEFAULT_AVAILABLE_MODELS,
+  DEFAULT_IMAGE_MODELS,
   MAX_STORED_STORIES,
   STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
+  type ModelOption,
 } from "./constants/story";
 import type { ExportItem, Story } from "./types/story";
 import {
@@ -54,9 +57,14 @@ type UserSettings = {
 
 const DEFAULT_SETTINGS: UserSettings = {
   maxLetters: 5,
-  model: "gemini-2.5-flash-lite",
+  model: "openai",
   imageModel: "gptimage",
   allCaps: false,
+};
+
+type ModelCatalogResponse = {
+  textModels?: ModelOption[];
+  imageModels?: ModelOption[];
 };
 
 function loadSettings(): UserSettings {
@@ -93,6 +101,12 @@ function App() {
   const [maxLetters, setMaxLetters] = useState(initialSettings.maxLetters);
   const [model, setModel] = useState(initialSettings.model);
   const [imageModel, setImageModel] = useState(initialSettings.imageModel);
+  const [availableModels, setAvailableModels] = useState<ModelOption[]>(
+    DEFAULT_AVAILABLE_MODELS
+  );
+  const [availableImageModels, setAvailableImageModels] = useState<
+    ModelOption[]
+  >(DEFAULT_IMAGE_MODELS);
   const [allCaps, setAllCaps] = useState(initialSettings.allCaps);
   const [story, setStory] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -245,6 +259,57 @@ function App() {
     inputRef.current?.focus();
   }, []);
 
+  // Load curated model options
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadModelCatalog = async () => {
+      try {
+        const response = await fetch("/api/models");
+        if (!response.ok) {
+          throw new Error(`Model API returned ${response.status}`);
+        }
+
+        const payload = (await response.json()) as ModelCatalogResponse;
+        if (isCancelled) return;
+
+        if (Array.isArray(payload.textModels) && payload.textModels.length >= 3) {
+          setAvailableModels(payload.textModels);
+        }
+
+        if (
+          Array.isArray(payload.imageModels) &&
+          payload.imageModels.length >= 3
+        ) {
+          setAvailableImageModels(payload.imageModels);
+        }
+      } catch (error) {
+        console.warn("Falling back to default model lists:", error);
+      }
+    };
+
+    void loadModelCatalog();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  // Keep stored settings aligned with currently available model lists
+  useEffect(() => {
+    if (availableModels.length === 0) return;
+    if (!availableModels.some((item) => item.id === model)) {
+      setModel(availableModels[0].id);
+    }
+  }, [availableModels, model]);
+
+  useEffect(() => {
+    if (availableImageModels.length === 0) return;
+    if (!availableImageModels.some((item) => item.id === imageModel)) {
+      setImageModel(availableImageModels[0].id);
+    }
+  }, [availableImageModels, imageModel]);
+
   // Load saved stories from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -372,6 +437,8 @@ function App() {
         topic: topic.trim(),
         title: storyTitle,
         maxLetters,
+        model: data.debug?.model ?? model,
+        imageModel: data.debug?.imageModel ?? imageModel,
         content: data.story,
         imageUrls: urls,
         createdAt: Date.now(),
@@ -555,6 +622,8 @@ function App() {
             maxLetters={maxLetters}
             model={model}
             imageModel={imageModel}
+            availableModels={availableModels}
+            availableImageModels={availableImageModels}
             isLoading={isLoading}
             savedStoriesCount={savedStories.length}
             inputRef={inputRef}

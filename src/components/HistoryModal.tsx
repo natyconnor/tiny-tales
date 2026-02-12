@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "motion/react";
 import { History, Trash2, X } from "lucide-react";
 
-import { MAX_STORED_STORIES } from "../constants/story";
+import { DEFAULT_AVAILABLE_MODELS, MAX_STORED_STORIES } from "../constants/story";
 import type { Story } from "../types/story";
 import {
   extractImageModelFromUrl,
@@ -66,10 +66,15 @@ export default function HistoryModal({
           <AnimatePresence mode="popLayout">
             {savedStories.map((savedStory) => {
               const imageModelId =
-                savedStory.imageUrls && savedStory.imageUrls.length > 0
+                savedStory.imageModel ??
+                (savedStory.imageUrls && savedStory.imageUrls.length > 0
                   ? extractImageModelFromUrl(savedStory.imageUrls[0])
-                  : null;
+                  : null);
               const imageModelName = getImageModelDisplayName(imageModelId);
+              const textModelName = savedStory.model
+                ? DEFAULT_AVAILABLE_MODELS.find((item) => item.id === savedStory.model)
+                    ?.name ?? savedStory.model
+                : null;
 
               return (
                 <motion.div
@@ -98,6 +103,11 @@ export default function HistoryModal({
                       Max {savedStory.maxLetters} letters •{" "}
                       {new Date(savedStory.createdAt).toLocaleDateString()}
                     </p>
+                    {textModelName && (
+                      <p className="text-xs text-indigo-600 font-lexend mt-1">
+                        ✍️ {textModelName}
+                      </p>
+                    )}
                     {imageModelId && (
                       <p className="text-xs text-purple-600 font-lexend mt-1">
                         🎨 {imageModelName}
