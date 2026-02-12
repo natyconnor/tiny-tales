@@ -1,12 +1,13 @@
 import { type RefObject, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { History, Sparkles, Wand2, Lightbulb } from "lucide-react";
+import { History, Sparkles, Wand2, Lightbulb, Info } from "lucide-react";
 
 import {
   LETTER_LABELS,
   type ModelOption,
   PROMPT_IDEAS,
 } from "../constants/story";
+import Tooltip from "./Tooltip";
 
 type StoryFormProps = {
   topic: string;
@@ -20,7 +21,11 @@ type StoryFormProps = {
   inputRef: RefObject<HTMLInputElement>;
   pollinationsStatus: "disconnected" | "validating" | "valid" | "invalid";
   pollinationsError: string;
-  lockedTextModelIds: string[];
+  pollinationsBalanceText: string;
+  pollinationsEstimateLoading: boolean;
+  pollinationsEstimateSummary: string;
+  pollinationsEstimateDetail: string;
+  pollinationsEstimateError: string;
   lockedImageModelIds: string[];
   premiumShowcaseModels: Array<{
     id: string;
@@ -48,7 +53,11 @@ export default function StoryForm({
   inputRef,
   pollinationsStatus,
   pollinationsError,
-  lockedTextModelIds,
+  pollinationsBalanceText,
+  pollinationsEstimateLoading,
+  pollinationsEstimateSummary,
+  pollinationsEstimateDetail,
+  pollinationsEstimateError,
   lockedImageModelIds,
   premiumShowcaseModels,
   onTopicChange,
@@ -90,11 +99,6 @@ export default function StoryForm({
   };
 
   const onStoryModelSelect = (value: string) => {
-    if (lockedTextModelIds.includes(value)) {
-      setPremiumPromptContext("story");
-      setShowPremiumPopup(true);
-      return;
-    }
     onModelChange(value);
   };
 
@@ -271,7 +275,6 @@ export default function StoryForm({
         >
           {availableModels.map((item) => (
             <option key={item.id} value={item.id}>
-              {lockedTextModelIds.includes(item.id) ? "🔒 " : ""}
               {item.name} — {item.description}
             </option>
           ))}
@@ -304,6 +307,69 @@ export default function StoryForm({
         </select>
       </motion.div>
 
+      {pollinationsStatus !== "valid" && (
+        <div className="mb-6 flex items-center gap-2 text-sm text-gray-600 font-lexend">
+          <span>Using shared AI credits</span>
+          <Tooltip text="Using Tiny Tales shared credits. Click to connect Pollinations and use your own balance + paid models.">
+            <button
+              type="button"
+              onClick={onConnectPollinations}
+              disabled={isLoading || pollinationsStatus === "validating"}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Shared credits info"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+        </div>
+      )}
+
+      {pollinationsStatus === "valid" && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm"
+        >
+          <p className="text-sm font-semibold text-emerald-900 font-lexend">
+            🌸 Pollinations balance: {pollinationsBalanceText || "Unavailable"}
+          </p>
+          {pollinationsEstimateLoading ? (
+            <p className="mt-1 text-sm text-emerald-800 font-lexend">
+              Estimating stories left from your latest usage...
+            </p>
+          ) : pollinationsEstimateSummary ? (
+            <>
+              <p className="mt-1 text-sm text-emerald-800 font-lexend">
+                {pollinationsEstimateSummary}
+              </p>
+              <p className="mt-1 text-xs text-emerald-700 font-lexend">
+                {pollinationsEstimateDetail}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-emerald-800 font-lexend">
+              Generate a few stories with this key to build a model-specific
+              estimate.
+            </p>
+          )}
+          {pollinationsEstimateError && (
+            <p className="mt-2 text-xs text-amber-700 font-lexend">
+              {pollinationsEstimateError}
+            </p>
+          )}
+          {pollinationsEstimateError && (
+            <button
+              type="button"
+              onClick={onConnectPollinations}
+              className="mt-3 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold font-lexend transition-colors"
+            >
+              Reconnect Pollinations
+            </button>
+          )}
+        </motion.div>
+      )}
+
       <AnimatePresence>
         {showPremiumPopup && (
           <motion.div
@@ -315,9 +381,8 @@ export default function StoryForm({
             className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm"
           >
             <p className="text-sm font-semibold text-amber-900 font-lexend">
-              That{" "}
-              {premiumPromptContext === "story" ? "story" : "image"} model is
-              a paid model.
+              That {premiumPromptContext === "story" ? "story" : "image"} model
+              is a paid model.
             </p>
             <p className="mt-1 text-sm text-amber-800 font-lexend">
               Connect Pollinations to use higher-quality paid models:
