@@ -3,7 +3,7 @@ import {
   DEFAULT_IMAGE_MODELS,
   DEFAULT_TEXT_MODELS,
   getCuratedModelCatalog,
-} from "./pollinationsCatalog";
+} from "./pollinationsCatalog.js";
 
 // Vercel serverless types
 interface VercelRequest extends IncomingMessage {

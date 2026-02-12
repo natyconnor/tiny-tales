@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { getCuratedModelCatalog } from "./pollinationsCatalog";
+import { getCuratedModelCatalog } from "./pollinationsCatalog.js";
 
 interface VercelRequest extends IncomingMessage {
   query: Record<string, string | string[]>;
