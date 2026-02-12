@@ -1,4 +1,4 @@
-import { type RefObject, useState } from "react";
+import { type RefObject, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { History, Sparkles, Wand2, Lightbulb } from "lucide-react";
 
@@ -18,12 +18,22 @@ type StoryFormProps = {
   isLoading: boolean;
   savedStoriesCount: number;
   inputRef: RefObject<HTMLInputElement>;
+  pollinationsStatus: "disconnected" | "validating" | "valid" | "invalid";
+  pollinationsError: string;
+  lockedTextModelIds: string[];
+  lockedImageModelIds: string[];
+  premiumShowcaseModels: Array<{
+    id: string;
+    name: string;
+    blurb: string;
+  }>;
   onTopicChange: (value: string) => void;
   onMaxLettersChange: (value: number) => void;
   onModelChange: (value: string) => void;
   onImageModelChange: (value: string) => void;
   onGenerate: () => void;
   onToggleHistory: () => void;
+  onConnectPollinations: () => void;
 };
 
 export default function StoryForm({
@@ -36,18 +46,34 @@ export default function StoryForm({
   isLoading,
   savedStoriesCount,
   inputRef,
+  pollinationsStatus,
+  pollinationsError,
+  lockedTextModelIds,
+  lockedImageModelIds,
+  premiumShowcaseModels,
   onTopicChange,
   onMaxLettersChange,
   onModelChange,
   onImageModelChange,
   onGenerate,
   onToggleHistory,
+  onConnectPollinations,
 }: StoryFormProps) {
   const [showHints, setShowHints] = useState(false);
   const [hintTimeout, setHintTimeout] = useState<ReturnType<
     typeof setTimeout
   > | null>(null);
+  const [showPremiumPopup, setShowPremiumPopup] = useState(false);
+  const [premiumPromptContext, setPremiumPromptContext] = useState<
+    "story" | "image"
+  >("story");
   const promptData = PROMPT_IDEAS[maxLetters] || PROMPT_IDEAS[5];
+
+  useEffect(() => {
+    if (pollinationsStatus === "valid") {
+      setShowPremiumPopup(false);
+    }
+  }, [pollinationsStatus]);
 
   // Delayed close to allow mouse to move from button to popover
   const handleMouseLeave = () => {
@@ -61,6 +87,24 @@ export default function StoryForm({
       setHintTimeout(null);
     }
     setShowHints(true);
+  };
+
+  const onStoryModelSelect = (value: string) => {
+    if (lockedTextModelIds.includes(value)) {
+      setPremiumPromptContext("story");
+      setShowPremiumPopup(true);
+      return;
+    }
+    onModelChange(value);
+  };
+
+  const onImageModelSelect = (value: string) => {
+    if (lockedImageModelIds.includes(value)) {
+      setPremiumPromptContext("image");
+      setShowPremiumPopup(true);
+      return;
+    }
+    onImageModelChange(value);
   };
 
   return (
@@ -221,12 +265,13 @@ export default function StoryForm({
         </label>
         <select
           value={model}
-          onChange={(event) => onModelChange(event.target.value)}
+          onChange={(event) => onStoryModelSelect(event.target.value)}
           disabled={isLoading}
           className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
           {availableModels.map((item) => (
             <option key={item.id} value={item.id}>
+              {lockedTextModelIds.includes(item.id) ? "🔒 " : ""}
               {item.name} — {item.description}
             </option>
           ))}
@@ -246,17 +291,78 @@ export default function StoryForm({
         </label>
         <select
           value={imageModel}
-          onChange={(event) => onImageModelChange(event.target.value)}
+          onChange={(event) => onImageModelSelect(event.target.value)}
           disabled={isLoading}
           className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-fuchsia-500 focus:ring-4 focus:ring-fuchsia-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
           {availableImageModels.map((item) => (
             <option key={item.id} value={item.id}>
+              {lockedImageModelIds.includes(item.id) ? "🔒 " : ""}
               {item.name} — {item.description}
             </option>
           ))}
         </select>
       </motion.div>
+
+      <AnimatePresence>
+        {showPremiumPopup && (
+          <motion.div
+            key="premium-unlock-popup"
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+            className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm"
+          >
+            <p className="text-sm font-semibold text-amber-900 font-lexend">
+              That{" "}
+              {premiumPromptContext === "story" ? "story" : "image"} model is
+              a paid model.
+            </p>
+            <p className="mt-1 text-sm text-amber-800 font-lexend">
+              Connect Pollinations to use higher-quality paid models:
+            </p>
+            <p className="mt-2 text-xs text-amber-700 font-lexend">
+              Charges come from the user's own Pollinations balance. Tiny Tales
+              does not receive these payments.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {premiumShowcaseModels.map((item) => (
+                <span
+                  key={item.id}
+                  className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 font-lexend"
+                >
+                  {item.name} · {item.blurb}
+                </span>
+              ))}
+            </div>
+            {pollinationsStatus === "invalid" && pollinationsError && (
+              <p className="mt-3 text-xs text-red-600 font-lexend">
+                {pollinationsError}
+              </p>
+            )}
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onConnectPollinations}
+                disabled={isLoading || pollinationsStatus === "validating"}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold font-lexend transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {pollinationsStatus === "validating"
+                  ? "Checking key..."
+                  : "Connect Pollinations"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPremiumPopup(false)}
+                className="px-3 py-2 rounded-xl bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 font-medium font-lexend transition-colors"
+              >
+                Not now
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Generate Button */}
       <motion.button

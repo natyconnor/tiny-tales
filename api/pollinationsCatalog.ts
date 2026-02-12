@@ -79,6 +79,7 @@ export const DEFAULT_TEXT_MODELS: CuratedModelOption[] = [
     id: "openai-large",
     name: "GPT-5.2",
     description: "Highest quality writing",
+    paidOnly: true,
   },
 ];
 
@@ -170,11 +171,15 @@ export async function getCuratedModelCatalog(): Promise<CuratedModelCatalog> {
   }
 }
 
-async function fetchPollinationsModels(url: string): Promise<PollinationsModel[]> {
+async function fetchPollinationsModels(
+  url: string
+): Promise<PollinationsModel[]> {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Model catalog fetch failed (${response.status}) for ${url}`);
+    throw new Error(
+      `Model catalog fetch failed (${response.status}) for ${url}`
+    );
   }
 
   const data = (await response.json()) as unknown;
@@ -185,7 +190,9 @@ async function fetchPollinationsModels(url: string): Promise<PollinationsModel[]
   return data as PollinationsModel[];
 }
 
-function selectTextModelSpread(models: PollinationsModel[]): CuratedModelOption[] {
+function selectTextModelSpread(
+  models: PollinationsModel[]
+): CuratedModelOption[] {
   const rejected = models
     .map((model) => ({
       model,
@@ -251,7 +258,11 @@ function selectTextModelSpread(models: PollinationsModel[]): CuratedModelOption[
       TEXT_ROLE_PREFERENCES.balanced,
       selected
     ) ??
-    pickClosestByCost(strongQualityPool, medianCost(strongQualityPool), selected);
+    pickClosestByCost(
+      strongQualityPool,
+      medianCost(strongQualityPool),
+      selected
+    );
   addUnique(selected, balanced);
 
   const reasoning =
@@ -288,18 +299,20 @@ function selectTextModelSpread(models: PollinationsModel[]): CuratedModelOption[
   const chosen = selected.slice(0, 4).map((model, index) => {
     const label =
       index === 0
-        ? "Fastest"
+        ? "🐇 Fastest"
         : index === 1
-          ? "Balanced"
-          : index === 2
-            ? "Reasoning"
-            : "Highest quality";
+        ? "⚖️ Balanced"
+        : index === 2
+        ? "🧠 Reasoning"
+        : "🏆 Highest quality";
 
     return buildModelOption(model, label);
   });
 
   debugLog(
-    `Text picks: ${chosen.map((item) => `${item.id}[${item.description}]`).join(", ")}`
+    `Text picks: ${chosen
+      .map((item) => `${item.id}[${item.description}]`)
+      .join(", ")}`
   );
   return chosen;
 }
@@ -338,8 +351,8 @@ function selectImageModelSpread(
     primaryPool.filter((model) => model.qualityScore >= 1).length >= 3
       ? primaryPool.filter((model) => model.qualityScore >= 1)
       : primaryPool.filter((model) => model.qualityScore >= 0).length >= 3
-        ? primaryPool.filter((model) => model.qualityScore >= 0)
-        : primaryPool;
+      ? primaryPool.filter((model) => model.qualityScore >= 0)
+      : primaryPool;
   const selected: ScoredImageModel[] = [];
 
   debugLog(
@@ -358,9 +371,9 @@ function selectImageModelSpread(
       .join(", ")}`
   );
   debugLog(
-    `Image strong-quality pool (${strongQualityPool.length}): ${strongQualityPool
-      .map((m) => m.name)
-      .join(", ")}`
+    `Image strong-quality pool (${
+      strongQualityPool.length
+    }): ${strongQualityPool.map((m) => m.name).join(", ")}`
   );
 
   const budgetQuality =
@@ -368,8 +381,7 @@ function selectImageModelSpread(
       strongQualityPool,
       IMAGE_ROLE_PREFERENCES.bestValue,
       selected
-    ) ??
-    [...strongQualityPool].sort(byQualityThenCost)[0];
+    ) ?? [...strongQualityPool].sort(byQualityThenCost)[0];
   addUnique(selected, budgetQuality);
 
   const balancedQuality =
@@ -419,12 +431,12 @@ function selectImageModelSpread(
   const chosen = selected.slice(0, 4).map((model, index) => {
     const label =
       index === 0
-        ? "Best value quality"
+        ? "💰 Best value quality"
         : index === 1
-          ? "Balanced quality"
-          : index === 2
-            ? "Top quality"
-            : "Quality alternative";
+        ? "⚖️ Balanced quality"
+        : index === 2
+        ? "🏆 Top quality"
+        : "💡 Quality alternative";
     return buildModelOption(model, label);
   });
 
@@ -436,9 +448,9 @@ function selectImageModelSpread(
   return chosen;
 }
 
-function choosePrimaryPool<T extends PollinationsModel & { estimatedCost: number }>(
-  models: T[]
-): T[] {
+function choosePrimaryPool<
+  T extends PollinationsModel & { estimatedCost: number }
+>(models: T[]): T[] {
   const freePool = models.filter((model) => !model.paid_only);
   if (freePool.length >= 3) {
     return freePool;
@@ -488,11 +500,16 @@ function estimateTextCost(model: PollinationsModel): number {
 }
 
 function estimateImageCost(model: PollinationsModel): number {
-  const completionImage = model.pricing?.completionImageTokens ?? Number.POSITIVE_INFINITY;
+  const completionImage =
+    model.pricing?.completionImageTokens ?? Number.POSITIVE_INFINITY;
   const promptText = model.pricing?.promptTextTokens ?? 0;
   const promptImage = model.pricing?.promptImageTokens ?? 0;
   const promptTokenBudget = 1200;
-  return completionImage + promptText * promptTokenBudget + promptImage * promptTokenBudget;
+  return (
+    completionImage +
+    promptText * promptTokenBudget +
+    promptImage * promptTokenBudget
+  );
 }
 
 function estimateImageQuality(model: PollinationsModel): number {
@@ -513,7 +530,9 @@ function estimateTextQuality(model: PollinationsModel): number {
 
   if ((model.input_modalities ?? []).includes("image")) score += 1;
   if (model.reasoning) score += 1;
-  if (/\b(powerful|capable|flagship|balanced|intelligent|reasoning)\b/i.test(text)) {
+  if (
+    /\b(powerful|capable|flagship|balanced|intelligent|reasoning)\b/i.test(text)
+  ) {
     score += 1;
   }
   if (/\b(ultra cheap|micro|alpha|preview)\b/i.test(text)) {
@@ -535,12 +554,11 @@ function pickPreferredById<T extends { name: string }>(
 ): T | undefined {
   return preferredIds
     .map((id) => models.find((model) => model.name === id))
-    .find(
-      (candidate): candidate is T =>
-        Boolean(
-          candidate &&
-            !alreadySelected.some((item) => item.name === candidate.name)
-        )
+    .find((candidate): candidate is T =>
+      Boolean(
+        candidate &&
+          !alreadySelected.some((item) => item.name === candidate.name)
+      )
     );
 }
 
@@ -548,8 +566,8 @@ function buildModelOption(
   model: PollinationsModel,
   label: string
 ): CuratedModelOption {
-  const premiumLabel = model.paid_only ? "Premium" : null;
-  const description = [label, premiumLabel].filter(Boolean).join(" - ");
+  const paidLabel = model.paid_only ? "Paid model" : null;
+  const description = [label, paidLabel].filter(Boolean).join(" - ");
 
   return {
     id: model.name,
@@ -587,13 +605,20 @@ function pickClosestByCost<T extends { estimatedCost: number; name: string }>(
   alreadySelected: T[]
 ): T | undefined {
   return models
-    .filter((model) => !alreadySelected.some((item) => item.name === model.name))
-    .sort((a, b) =>
-      Math.abs(a.estimatedCost - targetCost) - Math.abs(b.estimatedCost - targetCost)
+    .filter(
+      (model) => !alreadySelected.some((item) => item.name === model.name)
+    )
+    .sort(
+      (a, b) =>
+        Math.abs(a.estimatedCost - targetCost) -
+        Math.abs(b.estimatedCost - targetCost)
     )[0];
 }
 
-function addUnique<T extends { name: string }>(items: T[], candidate?: T): void {
+function addUnique<T extends { name: string }>(
+  items: T[],
+  candidate?: T
+): void {
   if (!candidate) return;
   if (items.some((item) => item.name === candidate.name)) return;
   items.push(candidate);

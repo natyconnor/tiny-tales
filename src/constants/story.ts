@@ -31,6 +31,7 @@ export const DEFAULT_AVAILABLE_MODELS: ModelOption[] = [
     id: "openai-large",
     name: "GPT-5.2",
     description: "Highest quality writing",
+    paidOnly: true,
   },
 ];
 

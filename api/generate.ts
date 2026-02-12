@@ -22,6 +22,7 @@ interface RequestBody {
   maxLetters: number;
   model?: string;
   imageModel?: string;
+  pollinationsApiKey?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -38,11 +39,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   log("Using Pollinations for text");
 
-  // Optional Pollinations API key
-  const pollinationsKey = process.env.POLLINATIONS_API_KEY;
+  // Optional server-side Pollinations API key
+  const configuredPollinationsKey = process.env.POLLINATIONS_API_KEY;
 
-  if (pollinationsKey) {
-    log(`Pollinations key found: ${pollinationsKey.slice(0, 8)}...`);
+  if (configuredPollinationsKey) {
+    log("Server POLLINATIONS_API_KEY is configured");
   }
 
   try {
@@ -53,10 +54,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       maxLetters,
       model: requestedModel,
       imageModel: requestedImageModel,
+      pollinationsApiKey: requestedPollinationsApiKey,
     } = body;
+
+    const byopPollinationsKey = sanitizeApiKey(requestedPollinationsApiKey);
+    const pollinationsKey = byopPollinationsKey ?? configuredPollinationsKey;
+
     log(
       `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}, imageModel=${requestedImageModel}`
     );
+    log(`Using BYOP key: ${byopPollinationsKey ? "yes" : "no"}`);
 
     // Validate input
     if (!topic || typeof topic !== "string") {
@@ -291,7 +298,12 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 
     // Build Pollinations URLs for each image prompt
     const imageUrls = imagePrompts.map((prompt, i) =>
-      buildPollinationsUrl(prompt, imageModelName, i === 0 ? log : undefined)
+      buildPollinationsUrl(
+        prompt,
+        imageModelName,
+        pollinationsKey,
+        i === 0 ? log : undefined
+      )
     );
     log(`Generated ${imageUrls.length} Pollinations URLs`);
 
@@ -307,6 +319,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
         imageModel: imageModelName,
         textApi: "pollinations",
         pollinationsKeyConfigured: !!pollinationsKey,
+        usingByopKey: !!byopPollinationsKey,
       },
     });
   } catch (error) {
@@ -514,10 +527,9 @@ GOOD examples for 8-letter limit:
 function buildPollinationsUrl(
   prompt: string,
   model: string,
+  pollinationsKey?: string,
   log?: (msg: string) => void
 ): string {
-  const pollinationsKey = process.env.POLLINATIONS_API_KEY;
-
   const params = new URLSearchParams({
     width: "512",
     height: "512",
@@ -527,15 +539,7 @@ function buildPollinationsUrl(
   });
 
   if (log) {
-    log(
-      `POLLINATIONS_API_KEY: ${
-        pollinationsKey
-          ? `"${pollinationsKey.slice(0, 8)}..." (${
-              pollinationsKey.length
-            } chars)`
-          : "NOT SET"
-      }`
-    );
+    log(`POLLINATIONS_API_KEY: ${pollinationsKey ? "SET" : "NOT SET"}`);
   }
 
   if (pollinationsKey) {
@@ -563,6 +567,12 @@ function buildPollinationsUrl(
   }
 
   return url;
+}
+
+function sanitizeApiKey(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
 }
 
 // Node.js serverless config

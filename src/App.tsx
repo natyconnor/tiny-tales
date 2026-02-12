@@ -67,6 +67,64 @@ type ModelCatalogResponse = {
   imageModels?: ModelOption[];
 };
 
+type PollinationsAccountKeyResponse = {
+  valid: boolean;
+  type?: "publishable" | "secret";
+  name?: string | null;
+  expiresAt?: string | null;
+  permissions?: {
+    models?: string[] | null;
+    account?: string[] | null;
+  };
+};
+
+type PollinationsKeyStatus =
+  | "disconnected"
+  | "validating"
+  | "valid"
+  | "invalid";
+
+const POLLINATIONS_KEY_STORAGE_KEY = "tiny-tales-pollinations-api-key";
+const PREMIUM_TEASER_TEXT_MODELS: ModelOption[] = [
+  {
+    id: "openai-large",
+    name: "GPT-5.2",
+    description: "Best story quality - Paid model",
+    paidOnly: true,
+  },
+];
+const PREMIUM_TEASER_IMAGE_MODELS: ModelOption[] = [
+  {
+    id: "nanobanana-pro",
+    name: "NanoBanana Pro",
+    description: "Most detailed illustrations - Paid model",
+    paidOnly: true,
+  },
+  {
+    id: "gptimage-large",
+    name: "GPT Image Large",
+    description: "Highest fidelity artwork - Paid model",
+    paidOnly: true,
+  },
+];
+const PREMIUM_SHOWCASE_MODELS = [
+  {
+    id: "openai-large",
+    name: "GPT-5.2",
+    blurb: "Best story quality",
+  },
+  {
+    id: "nanobanana-pro",
+    name: "NanoBanana Pro",
+    blurb: "Most detailed illustrations",
+  },
+  {
+    id: "gptimage-large",
+    name: "GPT Image Large",
+    blurb: "Highest fidelity artwork",
+  },
+] as const;
+
 function loadSettings(): UserSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -78,6 +136,47 @@ function loadSettings(): UserSettings {
     console.error("Failed to load settings from localStorage");
   }
   return DEFAULT_SETTINGS;
+}
+
+function loadStoredPollinationsKey(): string | null {
+  try {
+    const stored = localStorage.getItem(POLLINATIONS_KEY_STORAGE_KEY)?.trim();
+    return stored || null;
+  } catch {
+    console.error("Failed to load Pollinations API key from localStorage");
+    return null;
+  }
+}
+
+function parsePollinationsKeyFromHash(hash: string): string | null {
+  if (!hash.startsWith("#")) return null;
+  const params = new URLSearchParams(hash.slice(1));
+  const key = params.get("api_key")?.trim();
+  return key || null;
+}
+
+function clearHashFragment(): void {
+  if (!window.location.hash) return;
+  const cleanUrl = `${window.location.pathname}${window.location.search}`;
+  window.history.replaceState(null, "", cleanUrl);
+}
+
+function filterModelsForAccess(
+  models: ModelOption[],
+  keyStatus: PollinationsKeyStatus,
+  allowedModelIds: Set<string> | null
+): ModelOption[] {
+  if (keyStatus !== "valid") {
+    return models.filter((item) => !item.paidOnly);
+  }
+
+  if (!allowedModelIds) return models;
+
+  const exactMatches = models.filter((item) => allowedModelIds.has(item.id));
+  if (exactMatches.length > 0) return exactMatches;
+
+  // Fallback to free options if permissions don't match local model IDs.
+  return models.filter((item) => !item.paidOnly);
 }
 
 function App() {
@@ -129,6 +228,14 @@ function App() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [isLoadingShared, setIsLoadingShared] = useState(false);
+  const [pollinationsApiKey, setPollinationsApiKey] = useState<string | null>(
+    () => loadStoredPollinationsKey()
+  );
+  const [pollinationsKeyStatus, setPollinationsKeyStatus] =
+    useState<PollinationsKeyStatus>("disconnected");
+  const [pollinationsKeyDetails, setPollinationsKeyDetails] =
+    useState<PollinationsAccountKeyResponse | null>(null);
+  const [pollinationsKeyError, setPollinationsKeyError] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
   const { showOnboarding, completeOnboarding } = useOnboarding();
@@ -259,6 +366,78 @@ function App() {
     inputRef.current?.focus();
   }, []);
 
+  // Parse BYOP redirect fragment once and clear it from the URL.
+  useEffect(() => {
+    const keyFromHash = parsePollinationsKeyFromHash(window.location.hash);
+    if (!keyFromHash) return;
+
+    localStorage.setItem(POLLINATIONS_KEY_STORAGE_KEY, keyFromHash);
+    setPollinationsApiKey(keyFromHash);
+    setPollinationsKeyError("");
+    clearHashFragment();
+  }, []);
+
+  // Validate stored BYOP key and capture model permissions.
+  useEffect(() => {
+    if (!pollinationsApiKey) {
+      setPollinationsKeyStatus("disconnected");
+      setPollinationsKeyDetails(null);
+      setPollinationsKeyError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    const validateKey = async () => {
+      setPollinationsKeyStatus("validating");
+      setPollinationsKeyError("");
+
+      try {
+        const response = await fetch("https://gen.pollinations.ai/account/key", {
+          headers: {
+            Authorization: `Bearer ${pollinationsApiKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Key validation failed (${response.status})`);
+        }
+
+        const payload =
+          (await response.json()) as PollinationsAccountKeyResponse;
+
+        if (cancelled) return;
+
+        if (!payload.valid) {
+          setPollinationsKeyStatus("invalid");
+          setPollinationsKeyDetails(null);
+          setPollinationsKeyError(
+            "The Pollinations key is invalid or expired. Reconnect to use paid models."
+          );
+          return;
+        }
+
+        setPollinationsKeyStatus("valid");
+        setPollinationsKeyDetails(payload);
+      } catch (error) {
+        if (cancelled) return;
+        setPollinationsKeyStatus("invalid");
+        setPollinationsKeyDetails(null);
+        setPollinationsKeyError(
+          error instanceof Error
+            ? `Could not validate key: ${error.message}`
+            : "Could not validate Pollinations key right now."
+        );
+      }
+    };
+
+    void validateKey();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pollinationsApiKey]);
+
   // Load curated model options
   useEffect(() => {
     let isCancelled = false;
@@ -295,20 +474,78 @@ function App() {
     };
   }, []);
 
+  const allowedModelIds = useMemo(() => {
+    const models = pollinationsKeyDetails?.permissions?.models;
+    if (pollinationsKeyStatus !== "valid" || !Array.isArray(models)) {
+      return null;
+    }
+    return new Set(models);
+  }, [pollinationsKeyStatus, pollinationsKeyDetails]);
+
+  const selectableTextModels = useMemo(
+    () => filterModelsForAccess(availableModels, pollinationsKeyStatus, allowedModelIds),
+    [availableModels, pollinationsKeyStatus, allowedModelIds]
+  );
+
+  const selectableImageModels = useMemo(
+    () =>
+      filterModelsForAccess(
+        availableImageModels,
+        pollinationsKeyStatus,
+        allowedModelIds
+      ),
+    [availableImageModels, pollinationsKeyStatus, allowedModelIds]
+  );
+
+  const lockedTextTeasers = useMemo(() => {
+    if (pollinationsKeyStatus === "valid") return [];
+    return PREMIUM_TEASER_TEXT_MODELS.filter(
+      (item) => !selectableTextModels.some((modelItem) => modelItem.id === item.id)
+    );
+  }, [pollinationsKeyStatus, selectableTextModels]);
+
+  const lockedImageTeasers = useMemo(() => {
+    if (pollinationsKeyStatus === "valid") return [];
+    return PREMIUM_TEASER_IMAGE_MODELS.filter(
+      (item) =>
+        !selectableImageModels.some((modelItem) => modelItem.id === item.id)
+    );
+  }, [pollinationsKeyStatus, selectableImageModels]);
+
+  const dropdownTextModels = useMemo(
+    () => [...selectableTextModels, ...lockedTextTeasers],
+    [selectableTextModels, lockedTextTeasers]
+  );
+
+  const dropdownImageModels = useMemo(
+    () => [...selectableImageModels, ...lockedImageTeasers],
+    [selectableImageModels, lockedImageTeasers]
+  );
+
+  const lockedTextModelIds = useMemo(
+    () => lockedTextTeasers.map((item) => item.id),
+    [lockedTextTeasers]
+  );
+
+  const lockedImageModelIds = useMemo(
+    () => lockedImageTeasers.map((item) => item.id),
+    [lockedImageTeasers]
+  );
+
   // Keep stored settings aligned with currently available model lists
   useEffect(() => {
-    if (availableModels.length === 0) return;
-    if (!availableModels.some((item) => item.id === model)) {
-      setModel(availableModels[0].id);
+    if (selectableTextModels.length === 0) return;
+    if (!selectableTextModels.some((item) => item.id === model)) {
+      setModel(selectableTextModels[0].id);
     }
-  }, [availableModels, model]);
+  }, [selectableTextModels, model]);
 
   useEffect(() => {
-    if (availableImageModels.length === 0) return;
-    if (!availableImageModels.some((item) => item.id === imageModel)) {
-      setImageModel(availableImageModels[0].id);
+    if (selectableImageModels.length === 0) return;
+    if (!selectableImageModels.some((item) => item.id === imageModel)) {
+      setImageModel(selectableImageModels[0].id);
     }
-  }, [availableImageModels, imageModel]);
+  }, [selectableImageModels, imageModel]);
 
   // Load saved stories from localStorage
   useEffect(() => {
@@ -390,6 +627,9 @@ function App() {
     setBookletPreviewUrl(null);
 
     try {
+      const usablePollinationsKey =
+        pollinationsKeyStatus === "valid" ? pollinationsApiKey : undefined;
+
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: {
@@ -400,6 +640,7 @@ function App() {
           maxLetters,
           model,
           imageModel,
+          pollinationsApiKey: usablePollinationsKey,
         }),
       });
 
@@ -567,6 +808,16 @@ function App() {
     setShowReadingMode(true);
   };
 
+  const connectPollinations = useCallback(() => {
+    const redirectUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    const params = new URLSearchParams({
+      redirect_url: redirectUrl,
+    });
+    window.location.assign(
+      `https://enter.pollinations.ai/authorize?${params.toString()}`
+    );
+  }, []);
+
   const getBookletFileName = () => {
     const slug = topic
       .trim()
@@ -622,17 +873,27 @@ function App() {
             maxLetters={maxLetters}
             model={model}
             imageModel={imageModel}
-            availableModels={availableModels}
-            availableImageModels={availableImageModels}
+            availableModels={dropdownTextModels}
+            availableImageModels={dropdownImageModels}
             isLoading={isLoading}
             savedStoriesCount={savedStories.length}
             inputRef={inputRef}
+            pollinationsStatus={pollinationsKeyStatus}
+            pollinationsError={
+              pollinationsKeyStatus === "invalid" ? pollinationsKeyError : ""
+            }
+            lockedTextModelIds={lockedTextModelIds}
+            lockedImageModelIds={lockedImageModelIds}
+            premiumShowcaseModels={PREMIUM_SHOWCASE_MODELS.map((item) => ({
+              ...item,
+            }))}
             onTopicChange={setTopic}
             onMaxLettersChange={setMaxLetters}
             onModelChange={setModel}
             onImageModelChange={setImageModel}
             onGenerate={generateStory}
             onToggleHistory={() => setShowHistory((prev) => !prev)}
+            onConnectPollinations={connectPollinations}
           />
 
           <AnimatePresence mode="wait">
