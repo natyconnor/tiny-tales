@@ -16,12 +16,19 @@ type StoryDisplayProps = {
   title: string;
   story: string;
   imageUrls: string[];
+  displayImageUrls: Array<string | null>;
   loadedImages: boolean[];
+  failedImages: boolean[];
+  slowImages: boolean[];
+  blockedImages: boolean[];
+  imageErrorMessages: Array<string | null>;
+  policyWarning: string | null;
   isGeneratingImage: boolean;
   isSharing: boolean;
   allCaps: boolean;
   onImageLoad: (index: number, event: SyntheticEvent<HTMLImageElement>) => void;
   onImageError: (index: number, url: string) => void;
+  onRetryImage: (index: number) => void;
   onDownloadImage: () => void;
   onGenerateAnother: () => void;
   onOpenReadingMode: () => void;
@@ -48,12 +55,19 @@ export default function StoryDisplay({
   title,
   story,
   imageUrls,
+  displayImageUrls,
   loadedImages,
+  failedImages,
+  slowImages,
+  blockedImages,
+  imageErrorMessages,
+  policyWarning,
   isGeneratingImage,
   isSharing,
   allCaps,
   onImageLoad,
   onImageError,
+  onRetryImage,
   onDownloadImage,
   onGenerateAnother,
   onOpenReadingMode,
@@ -172,6 +186,14 @@ export default function StoryDisplay({
         </div>
       </motion.div>
 
+      {policyWarning && (
+        <div className="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800 font-lexend">
+            ⚠️ {policyWarning}
+          </p>
+        </div>
+      )}
+
       {/* Storybook Layout - 2-column responsive grid */}
       <div className="storybook-content">
         {imageUrls.length === 0 ? (
@@ -185,60 +207,104 @@ export default function StoryDisplay({
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {imageUrls.map((url, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{
-                  delay: 0.2 + index * 0.15,
-                  duration: 0.4,
-                  ease: "easeOut",
-                }}
-                className="story-page"
-              >
-                {/* Image */}
-                <div
-                  className={`relative aspect-[4/3] rounded-2xl overflow-hidden bg-gradient-to-br ${
-                    bgColors[index % bgColors.length]
-                  } mb-3`}
+            {imageUrls.map((url, index) => {
+              const displaySrc = displayImageUrls[index];
+              const isFailed = failedImages[index];
+              const isSlow = slowImages[index];
+              const isBlocked = blockedImages[index];
+              const errorMessage = imageErrorMessages[index];
+              const canRetry = !isBlocked && (isFailed || isSlow);
+              const shouldShowSpinner = !isFailed && !isBlocked;
+
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{
+                    delay: 0.2 + index * 0.15,
+                    duration: 0.4,
+                    ease: "easeOut",
+                  }}
+                  className="story-page"
                 >
-                  {!loadedImages[index] && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <div
-                          className={`w-12 h-12 border-4 ${
-                            spinnerColors[index % spinnerColors.length]
-                          } rounded-full animate-spin mx-auto mb-2`}
-                        />
-                        <p className="text-sm text-gray-500 font-lexend">
-                          Creating art...
-                        </p>
+                  {/* Image */}
+                  <div
+                    className={`relative aspect-[4/3] rounded-2xl overflow-hidden bg-gradient-to-br ${
+                      bgColors[index % bgColors.length]
+                    } mb-3`}
+                  >
+                    {!loadedImages[index] && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          {shouldShowSpinner && (
+                            <div
+                              className={`w-12 h-12 border-4 ${
+                                spinnerColors[index % spinnerColors.length]
+                              } rounded-full animate-spin mx-auto mb-2`}
+                            />
+                          )}
+                          <p className="text-sm text-gray-500 font-lexend">
+                            {isBlocked
+                              ? "Blocked by safety filters."
+                              : isFailed
+                              ? "Image failed to load."
+                              : "Creating art..."}
+                          </p>
+                          {isBlocked && (
+                            <p className="mt-2 text-xs text-amber-700 font-lexend max-w-xs">
+                              {errorMessage ||
+                                "Try a different image model or remove copyrighted/unsafe material."}
+                            </p>
+                          )}
+                          {canRetry && (
+                            <button
+                              type="button"
+                              onClick={() => onRetryImage(index)}
+                              className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-sm font-semibold text-pink-600 shadow transition-colors hover:bg-white"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Retry image
+                            </button>
+                          )}
+                          {isSlow && !isFailed && !isBlocked && (
+                            <p className="mt-2 text-xs text-gray-500 font-lexend">
+                              Taking longer than usual.
+                            </p>
+                          )}
+                          {isFailed && !isBlocked && errorMessage && (
+                            <p className="mt-2 text-xs text-gray-500 font-lexend max-w-xs">
+                              {errorMessage}
+                            </p>
+                          )}
+                        </div>
                       </div>
+                    )}
+                    {displaySrc && (
+                      <img
+                        src={displaySrc}
+                        alt={`Story illustration ${index + 1}`}
+                        className={`w-full h-full object-cover transition-opacity duration-500 ${
+                          loadedImages[index] ? "opacity-100" : "opacity-0"
+                        }`}
+                        data-story-image
+                        data-index={index}
+                        crossOrigin="anonymous"
+                        onLoad={(event) => onImageLoad(index, event)}
+                        onError={() => onImageError(index, url)}
+                      />
+                    )}
+                  </div>
+
+                  {/* Corresponding text segment */}
+                  {segments[index] && (
+                    <div className="text-base md:text-lg leading-relaxed text-gray-800 font-lexend font-medium story-text px-1">
+                      {renderStory(segments[index], allCaps)}
                     </div>
                   )}
-                  <img
-                    src={url}
-                    alt={`Story illustration ${index + 1}`}
-                    className={`w-full h-full object-cover transition-opacity duration-500 ${
-                      loadedImages[index] ? "opacity-100" : "opacity-0"
-                    }`}
-                    data-story-image
-                    data-index={index}
-                    crossOrigin="anonymous"
-                    onLoad={(event) => onImageLoad(index, event)}
-                    onError={() => onImageError(index, url)}
-                  />
-                </div>
-
-                {/* Corresponding text segment */}
-                {segments[index] && (
-                  <div className="text-base md:text-lg leading-relaxed text-gray-800 font-lexend font-medium story-text px-1">
-                    {renderStory(segments[index], allCaps)}
-                  </div>
-                )}
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>

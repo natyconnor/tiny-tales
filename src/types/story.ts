@@ -5,6 +5,8 @@ export interface Story {
   maxLetters: number;
   model?: string;
   imageModel?: string;
+  imageSafetyBlocked?: boolean;
+  imageSafetyReason?: string;
   content: string;
   imageUrls: string[];
   createdAt: number;

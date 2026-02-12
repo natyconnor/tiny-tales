@@ -113,6 +113,17 @@ export default function HistoryModal({
                         🎨 {imageModelName}
                       </p>
                     )}
+                    {savedStory.imageSafetyBlocked && (
+                      <p className="text-xs text-amber-700 font-lexend mt-1">
+                        ⚠️ Images blocked by safety filters
+                      </p>
+                    )}
+                    {savedStory.imageSafetyBlocked &&
+                      savedStory.imageSafetyReason && (
+                        <p className="text-xs text-amber-700/90 font-lexend mt-1 line-clamp-2">
+                          {savedStory.imageSafetyReason}
+                        </p>
+                      )}
                     <p className="text-gray-600 font-lexend mt-2 line-clamp-2 text-sm">
                       {savedStory.content.slice(0, 100)}...
                     </p>
