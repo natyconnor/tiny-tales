@@ -4,6 +4,7 @@ import {
   DEFAULT_TEXT_MODELS,
   getCuratedModelCatalog,
 } from "./pollinationsCatalog.js";
+import { createImageProxyToken } from "./imageProxyToken.js";
 
 // Vercel serverless types
 interface VercelRequest extends IncomingMessage {
@@ -296,16 +297,11 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       );
     });
 
-    // Build Pollinations URLs for each image prompt
+    // Build proxy URLs so API keys never appear in client-visible URLs
     const imageUrls = imagePrompts.map((prompt, i) =>
-      buildPollinationsUrl(
-        prompt,
-        imageModelName,
-        pollinationsKey,
-        i === 0 ? log : undefined
-      )
+      buildImageProxyUrl(prompt, imageModelName, i === 0 ? log : undefined)
     );
-    log(`Generated ${imageUrls.length} Pollinations URLs`);
+    log(`Generated ${imageUrls.length} proxied image URLs`);
 
     return res.status(200).json({
       title,
@@ -521,50 +517,18 @@ GOOD examples for 8-letter limit:
 }
 
 /**
- * Builds a Pollinations.ai image URL from a prompt
- * See available models at: https://gen.pollinations.ai/image/models
+ * Builds an internal proxy URL so the browser never sees the server API key.
  */
-function buildPollinationsUrl(
+function buildImageProxyUrl(
   prompt: string,
   model: string,
-  pollinationsKey?: string,
   log?: (msg: string) => void
 ): string {
-  const params = new URLSearchParams({
-    width: "512",
-    height: "512",
-    model: model,
-    safe: "true",
-    seed: "-1",
-  });
+  const token = createImageProxyToken(prompt, model);
+  const params = new URLSearchParams({ token });
 
-  if (log) {
-    log(`POLLINATIONS_API_KEY: ${pollinationsKey ? "SET" : "NOT SET"}`);
-  }
-
-  if (pollinationsKey) {
-    params.set("key", pollinationsKey);
-    if (log) {
-      log(`Added key param to URL`);
-    }
-  } else {
-    if (log) {
-      log(
-        `WARNING: No POLLINATIONS_API_KEY configured - using anonymous tier with rate limits`
-      );
-    }
-  }
-
-  const url = `https://gen.pollinations.ai/image/${encodeURIComponent(
-    prompt
-  )}?${params.toString()}`;
-
-  if (log) {
-    const safeUrl = pollinationsKey
-      ? url.replace(pollinationsKey, "[REDACTED]")
-      : url;
-    log(`Generated Pollinations URL: ${safeUrl}`);
-  }
+  const url = `/api/image?${params.toString()}`;
+  if (log) log(`Generated proxied image URL`);
 
   return url;
 }

@@ -8,7 +8,7 @@ const MODEL_INCLUDE_EXPERIMENTAL =
   process.env.MODEL_INCLUDE_EXPERIMENTAL === "true";
 
 const TEXT_ROLE_PREFERENCES = {
-  fastest: ["openai-fast", "gemini-fast", "nova-fast", "mistral"],
+  fastest: ["gemini-fast", "openai-fast", "nova-fast", "mistral"],
   balanced: ["openai", "gemini-fast", "mistral"],
   reasoning: ["deepseek", "openai-large", "glm", "minimax", "kimi"],
   quality: ["openai-large", "openai", "deepseek", "claude-fast"],
@@ -61,8 +61,8 @@ export type CuratedModelCatalog = {
 
 export const DEFAULT_TEXT_MODELS: CuratedModelOption[] = [
   {
-    id: "openai-fast",
-    name: "GPT-5 Nano",
+    id: "gemini-fast",
+    name: "Gemini 2.5 Flash Lite",
     description: "Fastest and cheapest",
   },
   {

@@ -13,8 +13,8 @@ export type ModelOption = {
 // These are safe fallbacks if API discovery fails.
 export const DEFAULT_AVAILABLE_MODELS: ModelOption[] = [
   {
-    id: "openai-fast",
-    name: "GPT-5 Nano",
+    id: "gemini-fast",
+    name: "Gemini 2.5 Flash Lite",
     description: "Fastest and cheapest",
   },
   {

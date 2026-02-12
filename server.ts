@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import generateHandler from "./api/generate";
+import imageHandler from "./api/image";
 import modelsHandler from "./api/models";
 import * as dotenv from "dotenv";
 
@@ -56,6 +57,12 @@ const runVercelHandler = async (
     getHeader: (name: string) => {
       return res.getHeader(name);
     },
+    end: (chunk?: unknown) => {
+      if (!res.headersSent) {
+        res.status(statusCode);
+      }
+      res.end(chunk);
+    },
   } as Parameters<typeof handler>[1];
 
   try {
@@ -78,10 +85,15 @@ app.get("/api/models", async (req, res) => {
   await runVercelHandler(req, res, modelsHandler);
 });
 
+app.get("/api/image", async (req, res) => {
+  await runVercelHandler(req, res, imageHandler);
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Local API server running on http://localhost:${PORT}`);
   console.log(`📡 API endpoint: http://localhost:${PORT}/api/generate`);
   console.log(`🧠 Model endpoint: http://localhost:${PORT}/api/models`);
+  console.log(`🖼️  Image endpoint: http://localhost:${PORT}/api/image`);
   console.log(
     `🎨 POLLINATIONS_API_KEY: ${
       process.env.POLLINATIONS_API_KEY

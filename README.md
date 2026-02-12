@@ -40,8 +40,10 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 
    Edit `.env.local` and add:
    ```env
-   # Pollinations API for AI text + image generation
+   # Pollinations API for AI text + server-proxied image generation
    POLLINATIONS_API_KEY=your_pollinations_api_key_here
+   # Recommended: stable secret for signed /api/image tokens
+   IMAGE_PROXY_SIGNING_SECRET=your_random_long_secret_here
    ```
    Get a key at [Pollinations](https://pollinations.ai/).
 
@@ -66,6 +68,7 @@ Deploy to **Vercel** (configured via `vercel.json`):
 2. Add environment variables:
    - `VITE_CONVEX_URL` — from your Convex dashboard (deploy with `npx convex deploy`)
    - `POLLINATIONS_API_KEY` — for AI generation
+   - `IMAGE_PROXY_SIGNING_SECRET` — secret used to sign internal image proxy URLs
 3. Deploy; Vercel builds the frontend and runs the API serverless function
 
 Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.
@@ -84,7 +87,9 @@ Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.
 ```
 tiny-tales/
 ├── api/
-│   └── generate.ts      # Vercel serverless function (Pollinations)
+│   ├── generate.ts      # Story generation endpoint
+│   ├── image.ts         # Server-side image proxy endpoint
+│   └── imageProxyToken.ts # HMAC signing helpers for proxy URLs
 ├── convex/
 │   ├── schema.ts        # Shared stories schema
 │   └── stories.ts       # Share & fetch mutations/queries

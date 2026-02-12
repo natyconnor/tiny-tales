@@ -22,6 +22,22 @@ function hashContent(str: string): string {
   return (hash >>> 0).toString(16);
 }
 
+function sanitizeImageUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.has("key")) {
+      parsed.searchParams.delete("key");
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function sanitizeImageUrls(urls: string[]): string[] {
+  return urls.map(sanitizeImageUrl);
+}
+
 export const share = mutation({
   args: {
     topic: v.string(),
@@ -31,6 +47,8 @@ export const share = mutation({
     imageUrls: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    const sanitizedImageUrls = sanitizeImageUrls(args.imageUrls);
+
     // Create a hash of the story content for deduplication
     const contentHash = hashContent(
       `${args.topic}|${args.title}|${args.content}|${args.maxLetters}`
@@ -57,7 +75,7 @@ export const share = mutation({
       title: args.title,
       content: args.content,
       maxLetters: args.maxLetters,
-      imageUrls: args.imageUrls,
+      imageUrls: sanitizedImageUrls,
       createdAt: Date.now(),
     });
 
@@ -73,6 +91,11 @@ export const getByShortId = query({
       .withIndex("by_shortId", (q) => q.eq("shortId", shortId))
       .first();
 
-    return story;
+    if (!story) return story;
+
+    return {
+      ...story,
+      imageUrls: sanitizeImageUrls(story.imageUrls),
+    };
   },
 });
