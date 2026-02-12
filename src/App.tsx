@@ -716,6 +716,16 @@ function App() {
             >
               Check out my other work
             </a>
+            <span className="text-gray-300">·</span>
+            <a
+              href="https://pollinations.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-pink-500 transition-colors underline underline-offset-2"
+              aria-label="Visit pollinations.ai"
+            >
+              Powered by pollinations.ai
+            </a>
           </p>
         </motion.footer>
       </div>

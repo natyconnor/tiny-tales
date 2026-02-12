@@ -109,4 +109,9 @@ tiny-tales/
 3. **Generate** — AI creates a story and 4 illustrations
 4. **Read & share** — Hover words, print, or share via link
 
+## 🙏 Attribution
+
+Tiny Tales uses [pollinations.ai](https://pollinations.ai/) for text and image generation.
+
+
 Made with ❤️ for little readers everywhere
