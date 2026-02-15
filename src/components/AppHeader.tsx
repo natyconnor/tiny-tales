@@ -34,7 +34,7 @@ export default function AppHeader() {
         transition={{ duration: 0.5, delay: 0.3 }}
         className="text-lg md:text-xl text-gray-600 font-lexend"
       >
-        ✨ Magical stories for little readers! ✨
+        ✨ Create short stories at your child's level ✨
       </motion.p>
     </header>
   );
