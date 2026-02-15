@@ -140,6 +140,10 @@ function App() {
     pollinationsEstimateSummary,
     pollinationsEstimateDetail,
     pollinationsUsageError,
+    sharedBalanceEnabled,
+    sharedBalanceText,
+    sharedBalanceLoading,
+    sharedBalanceError,
     usablePollinationsApiKey,
     refreshPollinationsUsage,
     connectPollinations,
@@ -508,6 +512,10 @@ function App() {
             pollinationsEstimateSummary={pollinationsEstimateSummary}
             pollinationsEstimateDetail={pollinationsEstimateDetail}
             pollinationsEstimateError={pollinationsUsageError}
+            sharedBalanceEnabled={sharedBalanceEnabled}
+            sharedBalanceText={sharedBalanceText}
+            sharedBalanceLoading={sharedBalanceLoading}
+            sharedBalanceError={sharedBalanceError}
             lockedImageModelIds={lockedImageModelIds}
             premiumShowcaseModels={premiumShowcaseModels}
             onTopicChange={setTopic}

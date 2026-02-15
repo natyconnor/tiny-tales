@@ -26,6 +26,10 @@ type StoryFormProps = {
   pollinationsEstimateSummary: string;
   pollinationsEstimateDetail: string;
   pollinationsEstimateError: string;
+  sharedBalanceEnabled: boolean;
+  sharedBalanceText: string;
+  sharedBalanceLoading: boolean;
+  sharedBalanceError: string;
   lockedImageModelIds: string[];
   premiumShowcaseModels: Array<{
     id: string;
@@ -58,6 +62,10 @@ export default function StoryForm({
   pollinationsEstimateSummary,
   pollinationsEstimateDetail,
   pollinationsEstimateError,
+  sharedBalanceEnabled,
+  sharedBalanceText,
+  sharedBalanceLoading,
+  sharedBalanceError,
   lockedImageModelIds,
   premiumShowcaseModels,
   onTopicChange,
@@ -308,19 +316,40 @@ export default function StoryForm({
       </motion.div>
 
       {pollinationsStatus !== "valid" && (
-        <div className="mb-6 flex items-center gap-2 text-sm text-gray-600 font-lexend">
-          <span>Using shared AI credits</span>
-          <Tooltip text="Using Tiny Tales shared credits. Click to connect Pollinations and use your own balance + paid models.">
-            <button
-              type="button"
-              onClick={onConnectPollinations}
-              disabled={isLoading || pollinationsStatus === "validating"}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Shared credits info"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
+        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-sm text-sky-900 font-lexend">
+            <span className="font-semibold">Using shared AI credits</span>
+            <Tooltip text="Using Tiny Tales shared credits. Click to connect Pollinations and use your own balance + paid models.">
+              <button
+                type="button"
+                onClick={onConnectPollinations}
+                disabled={isLoading || pollinationsStatus === "validating"}
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 text-sky-700 hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Shared credits info"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
+          </div>
+          {sharedBalanceEnabled &&
+            (sharedBalanceLoading ? (
+              <p className="mt-1 text-sm text-sky-800 font-lexend">
+                Checking shared pollen balance...
+              </p>
+            ) : sharedBalanceText ? (
+              <p className="mt-1 text-sm text-sky-800 font-lexend">
+                🌸 Shared pollen balance: {sharedBalanceText}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-sky-700 font-lexend">
+                Shared balance currently unavailable.
+              </p>
+            ))}
+          {sharedBalanceEnabled && sharedBalanceError && (
+            <p className="mt-1 text-xs text-amber-700 font-lexend">
+              {sharedBalanceError}
+            </p>
+          )}
         </div>
       )}
 

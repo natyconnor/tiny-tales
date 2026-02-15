@@ -40,6 +40,11 @@ type PollinationsAccountBalanceResponse = {
   balance: number;
 };
 
+type SharedBalanceApiResponse = {
+  balance?: number;
+  reason?: string;
+};
+
 type PollinationsUsageDailyRow = {
   date: string;
   model: string | null;
@@ -113,12 +118,18 @@ type UsePollinationsResult = {
   pollinationsEstimateSummary: string;
   pollinationsEstimateDetail: string;
   pollinationsUsageError: string;
+  sharedBalanceEnabled: boolean;
+  sharedBalanceText: string;
+  sharedBalanceLoading: boolean;
+  sharedBalanceError: string;
   usablePollinationsApiKey: string | undefined;
   refreshPollinationsUsage: () => void;
   connectPollinations: () => void;
 };
 
 const POLLINATIONS_KEY_STORAGE_KEY = "tiny-tales-pollinations-api-key";
+const SHARED_BALANCE_QUERY_PARAM = "showSharedBalance";
+const SHARED_BALANCE_COOKIE_NAME = "tiny_tales_show_shared_balance";
 
 const PREMIUM_TEASER_IMAGE_MODELS: ModelOption[] = [
   {
@@ -291,6 +302,26 @@ function formatApproxStoryCount(value: number): string {
   return `${roundApproxStoryCount(value)}`;
 }
 
+function formatPollenBalance(balance: number | null): string {
+  if (balance === null || !Number.isFinite(balance) || balance < 0) {
+    return "";
+  }
+
+  if (balance >= 100) {
+    return balance.toLocaleString(undefined, {
+      maximumFractionDigits: 0,
+    });
+  }
+  if (balance >= 10) {
+    return balance.toLocaleString(undefined, {
+      maximumFractionDigits: 1,
+    });
+  }
+  return balance.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  });
+}
+
 function findModelName(models: ModelOption[], modelId: string): string {
   const match = models.find((item) => item.id === modelId);
   return match?.name ?? modelId;
@@ -317,6 +348,24 @@ function clearHashFragment(): void {
   if (!window.location.hash) return;
   const cleanUrl = `${window.location.pathname}${window.location.search}`;
   window.history.replaceState(null, "", cleanUrl);
+}
+
+function readBooleanCookie(name: string): boolean | null {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(?:^|;\\s*)${escapedName}=([^;]*)`);
+  const match = document.cookie.match(pattern);
+  if (!match) return null;
+
+  const value = decodeURIComponent(match[1]).trim().toLowerCase();
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
+function writeBooleanCookie(name: string, enabled: boolean): void {
+  const maxAge = enabled ? 60 * 60 * 24 * 30 : 0;
+  const value = enabled ? "true" : "false";
+  document.cookie = `${name}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }
 
 function filterModelsForAccess(
@@ -368,6 +417,11 @@ export function usePollinations({
   const [pollinationsUsageError, setPollinationsUsageError] = useState("");
   const [pollinationsUsageRefreshKey, setPollinationsUsageRefreshKey] =
     useState(0);
+  const [sharedBalance, setSharedBalance] = useState<number | null>(null);
+  const [sharedBalanceEnabled, setSharedBalanceEnabled] = useState(false);
+  const [sharedBalanceLoading, setSharedBalanceLoading] = useState(false);
+  const [sharedBalanceError, setSharedBalanceError] = useState("");
+  const [sharedBalanceRefreshKey, setSharedBalanceRefreshKey] = useState(0);
 
   useEffect(() => {
     const keyFromHash = parsePollinationsKeyFromHash(window.location.hash);
@@ -377,6 +431,25 @@ export function usePollinations({
     setPollinationsApiKey(keyFromHash);
     setPollinationsKeyError("");
     clearHashFragment();
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const showSharedBalanceParam = params.get(SHARED_BALANCE_QUERY_PARAM);
+
+    if (showSharedBalanceParam === "true") {
+      writeBooleanCookie(SHARED_BALANCE_COOKIE_NAME, true);
+      setSharedBalanceEnabled(true);
+      return;
+    }
+
+    if (showSharedBalanceParam === "false") {
+      writeBooleanCookie(SHARED_BALANCE_COOKIE_NAME, false);
+      setSharedBalanceEnabled(false);
+      return;
+    }
+
+    setSharedBalanceEnabled(readBooleanCookie(SHARED_BALANCE_COOKIE_NAME) === true);
   }, []);
 
   useEffect(() => {
@@ -673,6 +746,76 @@ export function usePollinations({
     pollinationsUsageRefreshKey,
   ]);
 
+  useEffect(() => {
+    if (
+      !sharedBalanceEnabled ||
+      pollinationsKeyStatus === "valid" ||
+      pollinationsKeyStatus === "validating"
+    ) {
+      setSharedBalance(null);
+      setSharedBalanceLoading(false);
+      setSharedBalanceError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadSharedBalance = async () => {
+      setSharedBalanceLoading(true);
+      setSharedBalanceError("");
+
+      try {
+        const response = await fetch(
+          "/api/shared-balance?showSharedBalance=true",
+          {
+            credentials: "same-origin",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Shared balance request failed (${response.status})`);
+        }
+
+        const payload = (await response.json()) as SharedBalanceApiResponse;
+        if (cancelled) return;
+
+        if (
+          typeof payload.balance === "number" &&
+          Number.isFinite(payload.balance) &&
+          payload.balance >= 0
+        ) {
+          setSharedBalance(payload.balance);
+          setSharedBalanceError("");
+        } else {
+          setSharedBalance(null);
+          setSharedBalanceError(
+            typeof payload.reason === "string" && payload.reason.trim()
+              ? payload.reason
+              : "Shared balance unavailable right now."
+          );
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setSharedBalance(null);
+        setSharedBalanceError(
+          error instanceof Error
+            ? `Could not load shared balance: ${error.message}`
+            : "Could not load shared balance right now."
+        );
+      } finally {
+        if (!cancelled) {
+          setSharedBalanceLoading(false);
+        }
+      }
+    };
+
+    void loadSharedBalance();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pollinationsKeyStatus, sharedBalanceEnabled, sharedBalanceRefreshKey]);
+
   const selectableTextModels = useMemo(
     () =>
       filterModelsForAccess(availableModels, pollinationsKeyStatus, allowedModelIds),
@@ -816,28 +959,13 @@ export function usePollinations({
   ]);
 
   const pollinationsBalanceText = useMemo(() => {
-    if (
-      pollinationsBalance === null ||
-      !Number.isFinite(pollinationsBalance) ||
-      pollinationsBalance < 0
-    ) {
-      return "";
-    }
-
-    if (pollinationsBalance >= 100) {
-      return pollinationsBalance.toLocaleString(undefined, {
-        maximumFractionDigits: 0,
-      });
-    }
-    if (pollinationsBalance >= 10) {
-      return pollinationsBalance.toLocaleString(undefined, {
-        maximumFractionDigits: 1,
-      });
-    }
-    return pollinationsBalance.toLocaleString(undefined, {
-      maximumFractionDigits: 2,
-    });
+    return formatPollenBalance(pollinationsBalance);
   }, [pollinationsBalance]);
+
+  const sharedBalanceText = useMemo(
+    () => formatPollenBalance(sharedBalance),
+    [sharedBalance]
+  );
 
   const pollinationsEstimateSummary = useMemo(() => {
     if (!pollinationsStoryEstimate) return "";
@@ -892,9 +1020,14 @@ export function usePollinations({
     pollinationsKeyStatus === "valid" ? (pollinationsApiKey ?? undefined) : undefined;
 
   const refreshPollinationsUsage = useCallback(() => {
-    if (!usablePollinationsApiKey) return;
-    setPollinationsUsageRefreshKey((prev) => prev + 1);
-  }, [usablePollinationsApiKey]);
+    if (usablePollinationsApiKey) {
+      setPollinationsUsageRefreshKey((prev) => prev + 1);
+      return;
+    }
+    if (sharedBalanceEnabled && pollinationsKeyStatus !== "validating") {
+      setSharedBalanceRefreshKey((prev) => prev + 1);
+    }
+  }, [usablePollinationsApiKey, sharedBalanceEnabled, pollinationsKeyStatus]);
 
   const connectPollinations = useCallback(() => {
     const redirectUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
@@ -920,6 +1053,10 @@ export function usePollinations({
     pollinationsEstimateSummary,
     pollinationsEstimateDetail,
     pollinationsUsageError,
+    sharedBalanceEnabled,
+    sharedBalanceText,
+    sharedBalanceLoading,
+    sharedBalanceError,
     usablePollinationsApiKey,
     refreshPollinationsUsage,
     connectPollinations,

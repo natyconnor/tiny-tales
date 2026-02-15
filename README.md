@@ -58,6 +58,9 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 - **Terminals**: You need `npx convex dev` (Convex backend) and `pnpm dev:all` (frontend + API) running
 - **Alternative**: Run `pnpm dev:api` and `pnpm dev` separately if you prefer
 - **API port**: Override with `API_PORT` env variable
+- **Shared balance toggle**:
+  - Open with `?showSharedBalance=true` to show shared pollen balance and persist it in a cookie
+  - Open with `?showSharedBalance=false` to hide it again
 
 
 ## 🌐 Deployment
@@ -89,7 +92,8 @@ tiny-tales/
 ├── api/
 │   ├── generate.ts      # Story generation endpoint
 │   ├── image.ts         # Server-side image proxy endpoint
-│   └── imageProxyToken.ts # HMAC signing helpers for proxy URLs
+│   ├── imageProxyToken.ts # HMAC signing helpers for proxy URLs
+│   └── sharedBalance.ts # Shared Pollinations balance endpoint
 ├── convex/
 │   ├── schema.ts        # Shared stories schema
 │   └── stories.ts       # Share & fetch mutations/queries

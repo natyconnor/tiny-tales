@@ -3,6 +3,7 @@ import cors from "cors";
 import generateHandler from "./api/generate";
 import imageHandler from "./api/image";
 import modelsHandler from "./api/models";
+import sharedBalanceHandler from "./api/sharedBalance";
 import * as dotenv from "dotenv";
 
 // Load environment variables from .env.local or .env
@@ -20,6 +21,29 @@ type VercelHandler = (
 app.use(cors());
 app.use(express.json());
 
+const parseCookies = (
+  cookieHeader: string | string[] | undefined
+): Record<string, string> => {
+  if (!cookieHeader) return {};
+  const raw = Array.isArray(cookieHeader) ? cookieHeader.join(";") : cookieHeader;
+
+  return raw.split(";").reduce<Record<string, string>>((acc, entry) => {
+    const separatorIndex = entry.indexOf("=");
+    if (separatorIndex <= 0) return acc;
+
+    const name = entry.slice(0, separatorIndex).trim();
+    const value = entry.slice(separatorIndex + 1).trim();
+    if (!name) return acc;
+
+    try {
+      acc[name] = decodeURIComponent(value);
+    } catch {
+      acc[name] = value;
+    }
+    return acc;
+  }, {});
+};
+
 // Convert Express request/response to Vercel format
 const runVercelHandler = async (
   req: express.Request,
@@ -32,7 +56,7 @@ const runVercelHandler = async (
     url: req.url,
     headers: req.headers,
     query: (req.query || {}) as Record<string, string | string[]>,
-    cookies: (req.cookies || {}) as Record<string, string>,
+    cookies: parseCookies(req.headers.cookie) as Record<string, string>,
     body: req.body,
   } as Parameters<typeof handler>[0];
 
@@ -89,11 +113,18 @@ app.get("/api/image", async (req, res) => {
   await runVercelHandler(req, res, imageHandler);
 });
 
+app.get("/api/shared-balance", async (req, res) => {
+  await runVercelHandler(req, res, sharedBalanceHandler);
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Local API server running on http://localhost:${PORT}`);
   console.log(`📡 API endpoint: http://localhost:${PORT}/api/generate`);
   console.log(`🧠 Model endpoint: http://localhost:${PORT}/api/models`);
   console.log(`🖼️  Image endpoint: http://localhost:${PORT}/api/image`);
+  console.log(
+    `🌸 Shared balance endpoint: http://localhost:${PORT}/api/shared-balance`
+  );
   console.log(
     `🎨 POLLINATIONS_API_KEY: ${
       process.env.POLLINATIONS_API_KEY
