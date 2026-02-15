@@ -1,7 +1,10 @@
 import { motion, AnimatePresence } from "motion/react";
 import { History, Trash2, X } from "lucide-react";
 
-import { DEFAULT_AVAILABLE_MODELS, MAX_STORED_STORIES } from "../constants/story";
+import {
+  DEFAULT_AVAILABLE_MODELS,
+  MAX_STORED_STORIES,
+} from "../constants/story";
 import type { Story } from "../types/story";
 import {
   extractImageModelFromUrl,
@@ -72,8 +75,9 @@ export default function HistoryModal({
                   : null);
               const imageModelName = getImageModelDisplayName(imageModelId);
               const textModelName = savedStory.model
-                ? DEFAULT_AVAILABLE_MODELS.find((item) => item.id === savedStory.model)
-                    ?.name ?? savedStory.model
+                ? DEFAULT_AVAILABLE_MODELS.find(
+                    (item) => item.id === savedStory.model
+                  )?.name ?? savedStory.model
                 : null;
 
               return (
@@ -103,16 +107,24 @@ export default function HistoryModal({
                       Max {savedStory.maxLetters} letters •{" "}
                       {new Date(savedStory.createdAt).toLocaleDateString()}
                     </p>
-                    {textModelName && (
-                      <p className="text-xs text-indigo-600 font-lexend mt-1">
-                        ✍️ {textModelName}
-                      </p>
-                    )}
-                    {imageModelId && (
-                      <p className="text-xs text-purple-600 font-lexend mt-1">
-                        🎨 {imageModelName}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {textModelName && (
+                        <p className="text-xs text-indigo-600 font-lexend mt-1">
+                          ✍️ {textModelName}
+                        </p>
+                      )}
+                      {textModelName && imageModelId && (
+                        <span className="text-xs text-gray-500 font-lexend mt-1">
+                          {" "}
+                          •{" "}
+                        </span>
+                      )}
+                      {imageModelId && (
+                        <p className="text-xs text-purple-600 font-lexend mt-1">
+                          🎨 {imageModelName}
+                        </p>
+                      )}
+                    </div>
                     {savedStory.imageSafetyBlocked && (
                       <p className="text-xs text-amber-700 font-lexend mt-1">
                         ⚠️ Images blocked by safety filters
