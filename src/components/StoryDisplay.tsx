@@ -213,7 +213,7 @@ export default function StoryDisplay({
               const isSlow = slowImages[index];
               const isBlocked = blockedImages[index];
               const errorMessage = imageErrorMessages[index];
-              const canRetry = !isBlocked && (isFailed || isSlow);
+              const canRetry = !isBlocked && isFailed;
               const shouldShowSpinner = !isFailed && !isBlocked;
 
               return (
@@ -249,6 +249,8 @@ export default function StoryDisplay({
                               ? "Blocked by safety filters."
                               : isFailed
                               ? "Image failed to load."
+                              : isSlow
+                              ? "Image generation can take awhile...we're still chugging away! We'll let you know if something goes wrong."
                               : "Creating art..."}
                           </p>
                           {isBlocked && (
@@ -266,11 +268,6 @@ export default function StoryDisplay({
                               <RotateCcw className="h-4 w-4" />
                               Retry image
                             </button>
-                          )}
-                          {isSlow && !isFailed && !isBlocked && (
-                            <p className="mt-2 text-xs text-gray-500 font-lexend">
-                              Taking longer than usual.
-                            </p>
                           )}
                           {isFailed && !isBlocked && errorMessage && (
                             <p className="mt-2 text-xs text-gray-500 font-lexend max-w-xs">

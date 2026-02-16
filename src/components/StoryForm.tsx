@@ -201,7 +201,7 @@ export default function StoryForm({
           type="text"
           value={topic}
           onChange={(event) => onTopicChange(event.target.value)}
-          placeholder="A brave cat, magical forest, funny robot..."
+          placeholder="A shy cat who learns to be brave..."
           className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm"
           disabled={isLoading}
           onKeyDown={(event) => event.key === "Enter" && onGenerate()}

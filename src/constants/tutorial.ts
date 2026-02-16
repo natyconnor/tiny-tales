@@ -20,7 +20,7 @@ export const INITIAL_TUTORIAL_STEPS: TutorialStep[] = [
     id: "prompt",
     title: "What's Your Story About?",
     description:
-      "Type anything you'd like your story to be about! A brave cat, a magical forest, a funny robot... let your imagination run wild! Click the lightbulb for prompt ideas.",
+      "Type anything you'd like your story to be about! It helps to keep the subjects within your word limit but otherwise let your imagination run wild! Click the lightbulb for prompt ideas.",
     emoji: "🌟",
     targetSelector: "[data-tutorial='prompt']",
     position: "bottom",
