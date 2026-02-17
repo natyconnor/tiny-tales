@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Wand2 } from "lucide-react";
+import { RotateCcw, Wand2 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 
 import { api } from "../convex/_generated/api";
@@ -53,6 +53,8 @@ function downloadDataUrl(dataUrl: string, fileName: string): void {
   link.remove();
 }
 
+const STORY_GENERATION_SLOW_NOTICE_DELAY_MS = 15000;
+
 function App() {
   const initialSettings = useMemo(() => loadSettings(), []);
 
@@ -89,9 +91,18 @@ function App() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [isLoadingShared, setIsLoadingShared] = useState(false);
+  const [showSlowGenerationNotice, setShowSlowGenerationNotice] =
+    useState(false);
+  const [generationErrorMessage, setGenerationErrorMessage] = useState<
+    string | null
+  >(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
+  const storySectionRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollToStoryRef = useRef(false);
+  const generationRequestIdRef = useRef(0);
+  const generationAbortControllerRef = useRef<AbortController | null>(null);
 
   const {
     savedStories,
@@ -257,6 +268,35 @@ function App() {
   }, [story, imageUrls.length, imageDataUrls, triggerPostStoryOnboarding]);
 
   useEffect(() => {
+    if (isLoading || !story) return;
+    if (!shouldAutoScrollToStoryRef.current) return;
+
+    requestAnimationFrame(() => {
+      storySectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    shouldAutoScrollToStoryRef.current = false;
+  }, [isLoading, story]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setShowSlowGenerationNotice(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setShowSlowGenerationNotice(true);
+    }, STORY_GENERATION_SLOW_NOTICE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [isLoading]);
+
+  useEffect(() => {
     document.body.dataset.bookletReady = bookletPreviewUrl ? "true" : "false";
   }, [bookletPreviewUrl]);
 
@@ -280,6 +320,7 @@ function App() {
     setIsLoadingShared(false);
 
     if (sharedStory === null) {
+      setGenerationErrorMessage(null);
       setError("This story link has expired or doesn't exist.");
       return;
     }
@@ -311,6 +352,15 @@ function App() {
     const trimmedTopic = topic.trim();
     if (!trimmedTopic) return;
 
+    const requestId = generationRequestIdRef.current + 1;
+    generationRequestIdRef.current = requestId;
+    generationAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    generationAbortControllerRef.current = controller;
+
+    shouldAutoScrollToStoryRef.current = true;
+    setShowSlowGenerationNotice(false);
+    setGenerationErrorMessage(null);
     setIsLoading(true);
     setError("");
     setStory("");
@@ -330,6 +380,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
+        signal: controller.signal,
         body: JSON.stringify({
           topic: trimmedTopic,
           maxLetters,
@@ -345,6 +396,7 @@ function App() {
       }
 
       const data = await response.json();
+      if (requestId !== generationRequestIdRef.current) return;
 
       console.log("=== Story Generation Debug ===");
       console.log("Story length:", data.story?.length, "chars");
@@ -382,14 +434,36 @@ function App() {
 
       refreshPollinationsUsage();
     } catch (generationError) {
-      setError(
+      if (requestId !== generationRequestIdRef.current) return;
+
+      if (
+        generationError instanceof DOMException &&
+        generationError.name === "AbortError"
+      ) {
+        return;
+      }
+
+      shouldAutoScrollToStoryRef.current = false;
+      const message =
         generationError instanceof Error
           ? generationError.message
-          : "Oops! Our story wizard took a nap. Please try again! 🧙‍♂️💤"
-      );
+          : "Oops! Our story wizard took a nap. Please try again! 🧙‍♂️💤";
+      setError(message);
+      setGenerationErrorMessage(message);
     } finally {
-      setIsLoading(false);
+      if (generationAbortControllerRef.current === controller) {
+        generationAbortControllerRef.current = null;
+      }
+
+      if (requestId === generationRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
+  };
+
+  const retryStoryGeneration = () => {
+    generationAbortControllerRef.current?.abort();
+    void generateStory();
   };
 
   const loadStory = (savedStory: Story) => {
@@ -448,6 +522,7 @@ function App() {
       setShowShareModal(true);
     } catch (shareError) {
       console.error("Share error:", shareError);
+      setGenerationErrorMessage(null);
       setError(
         shareError instanceof Error
           ? shareError.message
@@ -538,6 +613,16 @@ function App() {
                 className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-center"
               >
                 <p className="text-red-600 font-medium font-lexend">{error}</p>
+                {generationErrorMessage && (
+                  <button
+                    type="button"
+                    onClick={retryStoryGeneration}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-sm font-semibold text-pink-600 shadow transition-colors hover:bg-white"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Retry story
+                  </button>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -587,8 +672,9 @@ function App() {
                     <p className="text-gray-500 font-lexend">
                       {isLoadingShared
                         ? "Just a moment!"
-                        : "Our wizard is writing something special!"}{" "}
-                      ✨
+                        : showSlowGenerationNotice
+                        ? "AI generation can take awhile. We'll let you know if something goes wrong."
+                        : "Our wizard is writing something special! ✨"}
                     </p>
                   </div>
                 </div>
@@ -597,7 +683,7 @@ function App() {
           </AnimatePresence>
         </div>
 
-        <div className="max-w-4xl mx-auto">
+        <div ref={storySectionRef} className="max-w-4xl mx-auto">
           <AnimatePresence mode="wait">
             {story && !isLoading && (
               <StoryDisplay
