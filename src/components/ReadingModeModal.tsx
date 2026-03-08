@@ -4,6 +4,11 @@ import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 type ReadingModeModalProps = {
   imageUrls: string[];
+  displayImageUrls: Array<string | null>;
+  loadedImages: boolean[];
+  failedImages: boolean[];
+  blockedImages: boolean[];
+  imageErrorMessages: Array<string | null>;
   segments: string[];
   currentIndex: number;
   allCaps: boolean;
@@ -27,6 +32,11 @@ const renderStoryText = (text: string, allCaps: boolean) => {
 
 export default function ReadingModeModal({
   imageUrls,
+  displayImageUrls,
+  loadedImages,
+  failedImages,
+  blockedImages,
+  imageErrorMessages,
   segments,
   currentIndex,
   allCaps,
@@ -36,6 +46,11 @@ export default function ReadingModeModal({
   const totalPanels = imageUrls.length;
   const hasNext = currentIndex < totalPanels - 1;
   const hasPrev = currentIndex > 0;
+  const currentDisplayImage = displayImageUrls[currentIndex];
+  const currentImageLoaded = loadedImages[currentIndex];
+  const currentImageFailed = failedImages[currentIndex];
+  const currentImageBlocked = blockedImages[currentIndex];
+  const currentImageError = imageErrorMessages[currentIndex];
 
   const goNext = useCallback(() => {
     if (hasNext) {
@@ -118,12 +133,33 @@ export default function ReadingModeModal({
             >
               {/* Large Image */}
               <div className="w-full max-w-2xl aspect-[4/3] rounded-2xl overflow-hidden shadow-xl border-4 border-purple-200 bg-gradient-to-br from-pink-100 to-purple-100">
-                <img
-                  src={imageUrls[currentIndex]}
-                  alt={`Story panel ${currentIndex + 1}`}
-                  className="w-full h-full object-cover"
-                  crossOrigin="anonymous"
-                />
+                {currentDisplayImage ? (
+                  <img
+                    src={currentDisplayImage}
+                    alt={`Story panel ${currentIndex + 1}`}
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${
+                      currentImageLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center px-6 text-center">
+                    <div>
+                      <p className="text-base font-semibold text-gray-600 font-lexend">
+                        {currentImageBlocked
+                          ? "This image was blocked by safety filters."
+                          : currentImageFailed
+                          ? "This image could not be loaded."
+                          : "Loading this illustration..."}
+                      </p>
+                      {currentImageError && (
+                        <p className="mt-2 text-sm text-gray-500 font-lexend">
+                          {currentImageError}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Large Text */}

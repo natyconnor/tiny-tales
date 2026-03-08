@@ -749,6 +749,11 @@ function App() {
           {showReadingMode && imageUrls.length > 0 && (
             <ReadingModeModal
               imageUrls={imageUrls}
+              displayImageUrls={displayImageUrls}
+              loadedImages={loadedImages}
+              failedImages={failedImages}
+              blockedImages={blockedImages}
+              imageErrorMessages={imageErrorMessages}
               segments={exportSegments}
               currentIndex={readingModeIndex}
               allCaps={allCaps}
