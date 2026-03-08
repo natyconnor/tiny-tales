@@ -10,9 +10,10 @@ const MODEL_INCLUDE_EXPERIMENTAL =
 const TEXT_ROLE_PREFERENCES = {
   fastest: ["gemini-fast", "openai-fast", "nova-fast", "mistral"],
   balanced: ["openai", "gemini-fast", "mistral"],
-  reasoning: ["deepseek", "openai-large", "glm", "minimax", "kimi"],
-  quality: ["openai-large", "openai", "deepseek", "claude-fast"],
+  quality: ["openai-large", "openai", "claude-fast"],
 } as const;
+
+const BLOCKED_TEXT_MODEL_IDS = new Set(["deepseek", "glm"]);
 
 const IMAGE_ROLE_PREFERENCES = {
   bestValue: ["gptimage", "klein", "klein-large", "nanobanana"],
@@ -69,11 +70,6 @@ export const DEFAULT_TEXT_MODELS: CuratedModelOption[] = [
     id: "openai",
     name: "GPT-5 Mini",
     description: "Balanced quality and speed",
-  },
-  {
-    id: "deepseek",
-    name: "DeepSeek V3.2",
-    description: "Alternative reasoning style",
   },
   {
     id: "openai-large",
@@ -265,17 +261,6 @@ function selectTextModelSpread(
     );
   addUnique(selected, balanced);
 
-  const reasoning =
-    pickPreferredById(
-      strongQualityPool.filter((model) => model.reasoning),
-      TEXT_ROLE_PREFERENCES.reasoning,
-      selected
-    ) ??
-    strongQualityPool
-      .filter((model) => model.reasoning)
-      .find((model) => !selected.some((item) => item.name === model.name));
-  addUnique(selected, reasoning);
-
   const highestQuality =
     pickPreferredById(
       strongQualityPool,
@@ -303,8 +288,8 @@ function selectTextModelSpread(
         : index === 1
         ? "⚖️ Balanced"
         : index === 2
-        ? "🧠 Reasoning"
-        : "🏆 Highest quality";
+        ? "🏆 Highest quality"
+        : "✨ Extra option";
 
     return buildModelOption(model, label);
   });
@@ -468,6 +453,7 @@ function isStoryImageModelCandidate(model: PollinationsModel): boolean {
 
 function getRejectedTextReason(model: PollinationsModel): string | null {
   if (model.is_specialized) return "specialized";
+  if (BLOCKED_TEXT_MODEL_IDS.has(model.name)) return "blocked";
 
   const inputModalities = model.input_modalities ?? [];
   const outputModalities = model.output_modalities ?? [];

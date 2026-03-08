@@ -23,11 +23,6 @@ export const DEFAULT_AVAILABLE_MODELS: ModelOption[] = [
     description: "Balanced quality and speed",
   },
   {
-    id: "deepseek",
-    name: "DeepSeek V3.2",
-    description: "Alternative reasoning style",
-  },
-  {
     id: "openai-large",
     name: "GPT-5.2",
     description: "Highest quality writing",

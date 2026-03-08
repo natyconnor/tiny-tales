@@ -79,7 +79,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const curatedCatalog = await getCuratedModelCatalog();
     const allowedTextModels = curatedCatalog.textModels.map((item) => item.id);
-    const allowedImageModels = curatedCatalog.imageModels.map((item) => item.id);
+    const allowedImageModels = curatedCatalog.imageModels.map(
+      (item) => item.id
+    );
     const defaultTextModel = allowedTextModels[0] ?? DEFAULT_TEXT_MODELS[0].id;
     const defaultImageModel =
       allowedImageModels[0] ?? DEFAULT_IMAGE_MODELS[0].id;
@@ -128,6 +130,7 @@ SKILL LEVEL: ${skillGuidance.complexity}
 STORY STRUCTURE:
 - Sentence length: ${skillGuidance.sentenceLength}
 - Total sentences: ${skillGuidance.sentenceCount}
+DO NOT EXCEED THESE LIMITS!
 
 CRITICAL GRAMMAR RULES:
 ${skillGuidance.grammarNotes}
