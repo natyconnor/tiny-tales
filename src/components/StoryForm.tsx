@@ -18,7 +18,7 @@ type StoryFormProps = {
   availableImageModels: ModelOption[];
   isLoading: boolean;
   savedStoriesCount: number;
-  inputRef: RefObject<HTMLInputElement>;
+  inputRef: RefObject<HTMLTextAreaElement>;
   pollinationsStatus: "disconnected" | "validating" | "valid" | "invalid";
   pollinationsError: string;
   pollinationsBalanceText: string;
@@ -91,6 +91,14 @@ export default function StoryForm({
       setShowPremiumPopup(false);
     }
   }, [pollinationsStatus]);
+
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "0px";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [inputRef, topic]);
 
   // Delayed close to allow mouse to move from button to popover
   const handleMouseLeave = () => {
@@ -196,15 +204,20 @@ export default function StoryForm({
             </AnimatePresence>
           </div>
         </div>
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
+          rows={1}
           value={topic}
           onChange={(event) => onTopicChange(event.target.value)}
           placeholder="A shy cat who learns to be brave..."
-          className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm"
+          className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm resize-none overflow-hidden"
           disabled={isLoading}
-          onKeyDown={(event) => event.key === "Enter" && onGenerate()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              onGenerate();
+            }
+          }}
         />
       </motion.div>
 

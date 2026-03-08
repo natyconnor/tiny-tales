@@ -97,7 +97,7 @@ function App() {
     string | null
   >(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const printContainerRef = useRef<HTMLDivElement>(null);
   const storySectionRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollToStoryRef = useRef(false);
