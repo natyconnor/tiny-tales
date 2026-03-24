@@ -26,6 +26,27 @@ interface RequestBody {
   pollinationsApiKey?: string;
 }
 
+type PollinationsErrorBody = {
+  status?: number;
+  success?: boolean;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+};
+
+function parsePollinationsError(text: string): PollinationsErrorBody | null {
+  try {
+    const parsed = JSON.parse(text) as PollinationsErrorBody;
+    if (parsed && typeof parsed === "object" && parsed.error) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = Date.now();
   const log = (msg: string) =>
@@ -235,10 +256,36 @@ Return a JSON object with this shape:
 
     if (!pollinationsResponse.ok) {
       const errorText = await pollinationsResponse.text();
-      log(
-        `Pollinations API error: ${pollinationsResponse.status} - ${errorText}`
-      );
-      throw new Error(`Pollinations API error: ${pollinationsResponse.status}`);
+      log(`Pollinations API error: ${pollinationsResponse.status} - ${errorText}`);
+
+      const parsed = parsePollinationsError(errorText);
+      const upstreamMessage = parsed?.error?.message;
+
+      if (pollinationsResponse.status === 401) {
+        return res.status(401).json({
+          error: upstreamMessage ?? "Pollinations API key is invalid or expired.",
+          code: "UNAUTHORIZED",
+        });
+      }
+
+      if (pollinationsResponse.status === 402) {
+        return res.status(402).json({
+          error: upstreamMessage ?? "Insufficient pollen balance. Top up at enter.pollinations.ai.",
+          code: "PAYMENT_REQUIRED",
+        });
+      }
+
+      if (pollinationsResponse.status === 403) {
+        return res.status(403).json({
+          error: upstreamMessage ?? "API key lacks the required permissions.",
+          code: "FORBIDDEN",
+        });
+      }
+
+      return res.status(pollinationsResponse.status >= 500 ? 502 : pollinationsResponse.status).json({
+        error: upstreamMessage ?? `Pollinations API error (${pollinationsResponse.status}).`,
+        code: parsed?.error?.code ?? "UPSTREAM_ERROR",
+      });
     }
 
     const pollinationsData = (await pollinationsResponse.json()) as {

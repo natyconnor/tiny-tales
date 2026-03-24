@@ -266,11 +266,13 @@ export function useStoryImages({
         }
 
         let detail = "";
+        let errorCode = "";
         if (contentType.includes("application/json")) {
           const payload = (await response.json().catch(() => null)) as
-            | { error?: string; detail?: string }
+            | { error?: string; detail?: string; code?: string }
             | null;
           detail = [payload?.error, payload?.detail].filter(Boolean).join(" ");
+          errorCode = payload?.code ?? "";
         } else {
           detail = (await response.text().catch(() => "")).slice(0, 500);
         }
@@ -278,11 +280,16 @@ export function useStoryImages({
         const fallback = `Image generation failed (${response.status}).`;
         const failureDetail = detail.trim() || fallback;
         const blockedBySafety = isSafetySystemRejection(failureDetail);
-        const failureMessage = blockedBySafety
-          ? toSafetyBlockedMessage(failureDetail)
-          : response.status >= 500
-          ? "Image service had an error. You can retry this image."
-          : "Image could not be generated for this scene. You can retry this image.";
+        let failureMessage: string;
+        if (blockedBySafety) {
+          failureMessage = toSafetyBlockedMessage(failureDetail);
+        } else if (errorCode === "PAYMENT_REQUIRED") {
+          failureMessage = "Out of pollen! Top up your balance at enter.pollinations.ai to continue generating images.";
+        } else if (response.status >= 500) {
+          failureMessage = "Image service had an error. You can retry this image.";
+        } else {
+          failureMessage = "Image could not be generated for this scene. You can retry this image.";
+        }
 
         if (IS_DEV) {
           pushDebugEntry({

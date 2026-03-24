@@ -133,9 +133,9 @@ const SHARED_BALANCE_COOKIE_NAME = "tiny_tales_show_shared_balance";
 
 const PREMIUM_TEASER_IMAGE_MODELS: ModelOption[] = [
   {
-    id: "nanobanana",
-    name: "NanoBanana",
-    description: "Excellent image quality for a good price - Paid model",
+    id: "nanobanana-2",
+    name: "NanoBanana 2",
+    description: "Gemini 3.1 Flash Image quality - Paid model",
     paidOnly: true,
   },
   {
@@ -154,9 +154,9 @@ const PREMIUM_TEASER_IMAGE_MODELS: ModelOption[] = [
 
 const PREMIUM_SHOWCASE_MODELS = [
   {
-    id: "nanobanana",
-    name: "NanoBanana",
-    blurb: "Excellent image quality for a good price",
+    id: "nanobanana-2",
+    name: "NanoBanana 2",
+    blurb: "Gemini 3.1 Flash Image quality",
   },
   {
     id: "nanobanana-pro",

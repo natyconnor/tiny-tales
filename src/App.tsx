@@ -401,6 +401,14 @@ function App() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        let userMessage = errorData.error || "Something went wrong";
+        if (errorData.code === "PAYMENT_REQUIRED") {
+          userMessage = "Out of pollen! Top up your balance at enter.pollinations.ai to continue generating stories.";
+        } else if (errorData.code === "UNAUTHORIZED") {
+          userMessage = "Your Pollinations API key is invalid or expired. Please reconnect your account.";
+        }
+
         if (IS_DEV) {
           debugLog.push({
             type: "generate",
@@ -411,7 +419,7 @@ function App() {
             error: errorData.error || `HTTP ${response.status}`,
           });
         }
-        throw new Error(errorData.error || "Something went wrong");
+        throw new Error(userMessage);
       }
 
       const data = await response.json();

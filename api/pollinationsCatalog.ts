@@ -18,15 +18,15 @@ const BLOCKED_TEXT_MODEL_IDS = new Set(["deepseek", "glm"]);
 const BLOCKED_IMAGE_MODEL_IDS = new Set(["gptimage", "gptimage-large"]);
 
 const IMAGE_ROLE_PREFERENCES = {
-  bestValue: ["grok-imagine", "klein", "qwen-image", "nanobanana"],
-  balanced: ["klein", "grok-imagine", "qwen-image", "nanobanana"],
+  bestValue: ["grok-imagine", "klein", "qwen-image", "nanobanana-2"],
+  balanced: ["klein", "grok-imagine", "qwen-image", "nanobanana-2"],
   topQuality: [
     "grok-imagine-pro",
     "nanobanana-pro",
     "qwen-image",
-    "nanobanana",
+    "nanobanana-2",
   ],
-  alternative: ["qwen-image", "grok-imagine", "klein", "nanobanana"],
+  alternative: ["qwen-image", "grok-imagine", "klein", "nanobanana-2"],
 } as const;
 
 type PollinationsPricing = {

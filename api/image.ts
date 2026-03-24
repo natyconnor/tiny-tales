@@ -12,10 +12,26 @@ interface VercelResponse extends ServerResponse {
   json: (body: unknown) => void;
 }
 
-const DEFAULT_WIDTH = "512";
-const DEFAULT_HEIGHT = "512";
-const DEFAULT_SAFE = "true";
-const DEFAULT_SEED = "-1";
+type PollinationsErrorBody = {
+  status?: number;
+  success?: boolean;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+};
+
+function parsePollinationsError(text: string): PollinationsErrorBody | null {
+  try {
+    const parsed = JSON.parse(text) as PollinationsErrorBody;
+    if (parsed && typeof parsed === "object" && parsed.error) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -33,14 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: "Invalid image token" });
     }
 
-    const params = new URLSearchParams({
-      width: DEFAULT_WIDTH,
-      height: DEFAULT_HEIGHT,
-      model: payload.model,
-      safe: DEFAULT_SAFE,
-      seed: DEFAULT_SEED,
-    });
-
     const configuredPollinationsKey = process.env.POLLINATIONS_API_KEY?.trim();
     const upstreamPollinationsKey =
       payload.pollinationsApiKey ?? configuredPollinationsKey;
@@ -51,31 +59,80 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const upstreamUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(
-      payload.prompt
-    )}?${params.toString()}`;
+    const upstreamResponse = await fetch(
+      "https://gen.pollinations.ai/v1/images/generations",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${upstreamPollinationsKey}`,
+        },
+        body: JSON.stringify({
+          model: payload.model,
+          prompt: payload.prompt,
+          size: "512x512",
+          response_format: "url",
+        }),
+      }
+    );
 
-    const upstreamResponse = await fetch(upstreamUrl, {
-      headers: {
-        Authorization: `Bearer ${upstreamPollinationsKey}`,
-      },
-    });
     if (!upstreamResponse.ok) {
-      const detail = (await upstreamResponse.text()).slice(0, 500);
+      const errorText = (await upstreamResponse.text()).slice(0, 500);
+      const parsed = parsePollinationsError(errorText);
+      const upstreamMessage = parsed?.error?.message;
+
+      if (upstreamResponse.status === 402) {
+        return res.status(402).json({
+          error: upstreamMessage ?? "Insufficient pollen balance. Top up at enter.pollinations.ai.",
+          code: "PAYMENT_REQUIRED",
+        });
+      }
+
       return res.status(upstreamResponse.status).json({
-        error: `Image generation failed (${upstreamResponse.status})`,
-        detail,
+        error: upstreamMessage ?? `Image generation failed (${upstreamResponse.status}).`,
+        code: parsed?.error?.code ?? "UPSTREAM_ERROR",
+        detail: errorText,
       });
     }
 
-    const contentType =
-      upstreamResponse.headers.get("content-type") ?? "image/jpeg";
-    const cacheControl =
-      upstreamResponse.headers.get("cache-control") ?? "public, max-age=86400";
-    const imageBuffer = Buffer.from(await upstreamResponse.arrayBuffer());
+    const result = (await upstreamResponse.json()) as {
+      data?: Array<{ url?: string; b64_json?: string }>;
+    };
+
+    const imageUrl = result.data?.[0]?.url;
+    const b64 = result.data?.[0]?.b64_json;
+
+    if (!imageUrl && b64) {
+      const imageBuffer = Buffer.from(b64, "base64");
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Content-Length", imageBuffer.byteLength.toString());
+      res.end(imageBuffer);
+      return;
+    }
+
+    if (!imageUrl) {
+      return res.status(502).json({
+        error: "Image generation succeeded but returned no image URL.",
+        code: "NO_IMAGE_URL",
+      });
+    }
+
+    const imageResponse = await fetch(imageUrl, {
+      headers: { Authorization: `Bearer ${upstreamPollinationsKey}` },
+    });
+    if (!imageResponse.ok) {
+      return res.status(502).json({
+        error: `Failed to download generated image (${imageResponse.status}).`,
+        code: "IMAGE_DOWNLOAD_FAILED",
+      });
+    }
+
+    const contentType = imageResponse.headers.get("content-type") ?? "image/jpeg";
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Cache-Control", cacheControl);
+    res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Content-Length", imageBuffer.byteLength.toString());
     res.end(imageBuffer);
   } catch (error) {
