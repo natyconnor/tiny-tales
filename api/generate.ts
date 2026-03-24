@@ -192,7 +192,7 @@ Example of a BAD prompt:
 (Bad because it uses names without descriptions - image generator doesn't know what Pat and Tim look like!)
 
 === RESPONSE FORMAT ===
-Respond with ONLY valid JSON (no markdown, no code blocks):
+Return a JSON object with this shape:
 {
   "title": "Short catchy book title (2-5 words)",
   "story": "The simple story text with ${maxLetters}-letter-max words...",
@@ -222,6 +222,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
         },
         body: JSON.stringify({
           model: modelName,
+          response_format: { type: "json_object" },
           messages: [
             {
               role: "user",
@@ -258,20 +259,22 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       imagePrompts: string[];
     };
     try {
-      // Remove any markdown code block markers if present
-      const cleanJson = responseText
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      parsed = JSON.parse(cleanJson);
+      parsed = JSON.parse(responseText);
     } catch {
-      log("Failed to parse JSON, attempting to extract story");
-      // Fallback: if JSON parsing fails, use the response as story text
-      parsed = {
-        story: responseText,
-        imagePrompts: [],
-      };
+      // Fallback: strip markdown fences in case the model ignored response_format
+      try {
+        const cleanJson = responseText
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```$/i, "")
+          .trim();
+        parsed = JSON.parse(cleanJson);
+      } catch {
+        log("Failed to parse JSON response, using raw text as story");
+        parsed = {
+          story: responseText,
+          imagePrompts: [],
+        };
+      }
     }
 
     // Validate the parsed response
