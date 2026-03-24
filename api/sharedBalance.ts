@@ -50,7 +50,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const pollinationsApiKey = process.env.POLLINATIONS_API_KEY?.trim();
   if (!pollinationsApiKey) {
     return res.status(503).json({
-      error: "Shared balance unavailable because POLLINATIONS_API_KEY is missing",
+      error:
+        "Shared balance unavailable because POLLINATIONS_API_KEY is missing. Configure a server Pollinations key to enable shared balance, or connect a personal key in the app for per-user generation.",
     });
   }
 

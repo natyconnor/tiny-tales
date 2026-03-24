@@ -145,9 +145,9 @@ const PREMIUM_TEASER_IMAGE_MODELS: ModelOption[] = [
     paidOnly: true,
   },
   {
-    id: "gptimage-large",
-    name: "GPT Image Large",
-    description: "OpenAI's highest image quality - Paid model",
+    id: "grok-imagine-pro",
+    name: "Grok Imagine Pro",
+    description: "xAI's premium image quality - Paid model",
     paidOnly: true,
   },
 ];
@@ -164,9 +164,9 @@ const PREMIUM_SHOWCASE_MODELS = [
     blurb: "Highest Gemini image quality",
   },
   {
-    id: "gptimage-large",
-    name: "GPT Image Large",
-    blurb: "OpenAI's highest image quality",
+    id: "grok-imagine-pro",
+    name: "Grok Imagine Pro",
+    blurb: "xAI's premium image quality",
   },
 ] as const;
 

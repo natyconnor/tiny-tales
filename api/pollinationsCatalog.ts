@@ -1,5 +1,6 @@
-const TEXT_MODELS_URL = "https://gen.pollinations.ai/text/models";
-const IMAGE_MODELS_URL = "https://gen.pollinations.ai/image/models";
+const MODELS_URL = "https://gen.pollinations.ai/v1/models";
+const LEGACY_TEXT_MODELS_URL = "https://gen.pollinations.ai/text/models";
+const LEGACY_IMAGE_MODELS_URL = "https://gen.pollinations.ai/image/models";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MODEL_DEBUG_ENABLED =
   process.env.MODEL_SELECTION_DEBUG === "true" ||
@@ -14,19 +15,18 @@ const TEXT_ROLE_PREFERENCES = {
 } as const;
 
 const BLOCKED_TEXT_MODEL_IDS = new Set(["deepseek", "glm"]);
+const BLOCKED_IMAGE_MODEL_IDS = new Set(["gptimage", "gptimage-large"]);
 
 const IMAGE_ROLE_PREFERENCES = {
-  bestValue: ["gptimage", "klein", "klein-large", "nanobanana"],
-  balanced: ["klein", "gptimage", "klein-large", "nanobanana"],
+  bestValue: ["grok-imagine", "klein", "qwen-image", "nanobanana"],
+  balanced: ["klein", "grok-imagine", "qwen-image", "nanobanana"],
   topQuality: [
-    "klein-large",
+    "grok-imagine-pro",
     "nanobanana-pro",
-    "gptimage-large",
-    "seedream-pro",
-    "seedream",
+    "qwen-image",
     "nanobanana",
   ],
-  alternative: ["klein", "gptimage", "nanobanana", "kontext"],
+  alternative: ["qwen-image", "grok-imagine", "klein", "nanobanana"],
 } as const;
 
 type PollinationsPricing = {
@@ -39,13 +39,19 @@ type PollinationsPricing = {
 
 type PollinationsModel = {
   name: string;
+  aliases: string[];
   description?: string;
   pricing?: PollinationsPricing;
-  input_modalities?: string[];
-  output_modalities?: string[];
+  input_modalities: string[];
+  output_modalities: string[];
+  supported_endpoints: string[];
   reasoning?: boolean;
   is_specialized?: boolean;
   paid_only?: boolean;
+};
+
+type PollinationsModelEnvelope = {
+  data?: unknown;
 };
 
 export type CuratedModelOption = {
@@ -81,8 +87,8 @@ export const DEFAULT_TEXT_MODELS: CuratedModelOption[] = [
 
 export const DEFAULT_IMAGE_MODELS: CuratedModelOption[] = [
   {
-    id: "gptimage",
-    name: "GPT Image 1 Mini",
+    id: "grok-imagine",
+    name: "Grok Imagine",
     description: "Best value image quality",
   },
   {
@@ -91,9 +97,9 @@ export const DEFAULT_IMAGE_MODELS: CuratedModelOption[] = [
     description: "Balanced quality and price",
   },
   {
-    id: "klein-large",
-    name: "FLUX.2 Klein 9B",
-    description: "Higher quality option",
+    id: "qwen-image",
+    name: "Qwen Image Plus",
+    description: "Alternative high-quality style",
   },
 ];
 
@@ -123,10 +129,7 @@ export async function getCuratedModelCatalog(): Promise<CuratedModelCatalog> {
   }
 
   try {
-    const [textModels, imageModels] = await Promise.all([
-      fetchPollinationsModels(TEXT_MODELS_URL),
-      fetchPollinationsModels(IMAGE_MODELS_URL),
-    ]);
+    const { textModels, imageModels } = await fetchPollinationsModels();
 
     const nextCatalog: CuratedModelCatalog = {
       textModels: selectTextModelSpread(textModels),
@@ -167,9 +170,48 @@ export async function getCuratedModelCatalog(): Promise<CuratedModelCatalog> {
   }
 }
 
-async function fetchPollinationsModels(
-  url: string
-): Promise<PollinationsModel[]> {
+async function fetchPollinationsModels(): Promise<{
+  textModels: PollinationsModel[];
+  imageModels: PollinationsModel[];
+}> {
+  const [modelsResult, legacyTextResult, legacyImageResult] =
+    await Promise.allSettled([
+      fetchNormalizedModels(MODELS_URL),
+      fetchNormalizedModels(LEGACY_TEXT_MODELS_URL),
+      fetchNormalizedModels(LEGACY_IMAGE_MODELS_URL),
+    ]);
+
+  const legacyModels = mergeDuplicateModels([
+    ...(legacyTextResult.status === "fulfilled" ? legacyTextResult.value : []),
+    ...(legacyImageResult.status === "fulfilled" ? legacyImageResult.value : []),
+  ]);
+
+  if (modelsResult.status === "fulfilled") {
+    const mergedModels = mergeModelMetadata(modelsResult.value, legacyModels);
+    return splitDiscoveredModels(mergedModels);
+  }
+
+  if (legacyModels.length > 0) {
+    debugLog(
+      `Falling back to legacy model endpoints after /v1/models failed: ${
+        modelsResult.reason instanceof Error
+          ? modelsResult.reason.message
+          : String(modelsResult.reason)
+      }`
+    );
+    return splitDiscoveredModels(legacyModels);
+  }
+
+  throw new Error(
+    `Failed to load Pollinations model catalogs: ${collectModelFetchErrorMessages(
+      modelsResult,
+      legacyTextResult,
+      legacyImageResult
+    )}`
+  );
+}
+
+async function fetchNormalizedModels(url: string): Promise<PollinationsModel[]> {
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -179,11 +221,248 @@ async function fetchPollinationsModels(
   }
 
   const data = (await response.json()) as unknown;
-  if (!Array.isArray(data)) {
-    throw new Error(`Unexpected model catalog format for ${url}`);
+  return normalizeModelResponse(data, url);
+}
+
+function normalizeModelResponse(
+  data: unknown,
+  url: string
+): PollinationsModel[] {
+  if (Array.isArray(data)) {
+    return data.map(normalizeModelEntry).filter(isDefined);
   }
 
-  return data as PollinationsModel[];
+  if (
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as PollinationsModelEnvelope).data)
+  ) {
+    const entries = (data as PollinationsModelEnvelope).data as unknown[];
+    return entries.map(normalizeModelEntry).filter(isDefined);
+  }
+
+  throw new Error(`Unexpected model catalog format for ${url}`);
+}
+
+function normalizeModelEntry(entry: unknown): PollinationsModel | null {
+  if (!entry || typeof entry !== "object") return null;
+
+  const raw = entry as Record<string, unknown>;
+  const name = readString(raw.name) ?? readString(raw.id);
+  if (!name) return null;
+
+  return {
+    name,
+    aliases: normalizeStringArray(raw.aliases),
+    description: readString(raw.description),
+    pricing: normalizePricing(raw.pricing),
+    input_modalities: normalizeStringArray(raw.input_modalities),
+    output_modalities: normalizeStringArray(raw.output_modalities),
+    supported_endpoints: normalizeStringArray(raw.supported_endpoints),
+    reasoning: raw.reasoning === true ? true : undefined,
+    is_specialized: raw.is_specialized === true ? true : undefined,
+    paid_only: raw.paid_only === true ? true : undefined,
+  };
+}
+
+function normalizePricing(value: unknown): PollinationsPricing | undefined {
+  if (!value || typeof value !== "object") return undefined;
+
+  const raw = value as Record<string, unknown>;
+  const pricing: PollinationsPricing = {
+    currency: readString(raw.currency),
+    promptTextTokens: toFiniteNumber(raw.promptTextTokens),
+    promptImageTokens: toFiniteNumber(raw.promptImageTokens),
+    completionTextTokens: toFiniteNumber(raw.completionTextTokens),
+    completionImageTokens: toFiniteNumber(raw.completionImageTokens),
+  };
+
+  if (
+    !pricing.currency &&
+    pricing.promptTextTokens === undefined &&
+    pricing.promptImageTokens === undefined &&
+    pricing.completionTextTokens === undefined &&
+    pricing.completionImageTokens === undefined
+  ) {
+    return undefined;
+  }
+
+  return pricing;
+}
+
+function splitDiscoveredModels(models: PollinationsModel[]): {
+  textModels: PollinationsModel[];
+  imageModels: PollinationsModel[];
+} {
+  return {
+    textModels: models.filter(isDiscoveredTextModel),
+    imageModels: models.filter(isDiscoveredImageModel),
+  };
+}
+
+function isDiscoveredTextModel(model: PollinationsModel): boolean {
+  return (
+    model.output_modalities.includes("text") ||
+    model.supported_endpoints.some(
+      (endpoint) =>
+        endpoint === "/v1/chat/completions" || endpoint.startsWith("/text/")
+    )
+  );
+}
+
+function isDiscoveredImageModel(model: PollinationsModel): boolean {
+  return (
+    model.output_modalities.includes("image") ||
+    model.supported_endpoints.some(
+      (endpoint) =>
+        endpoint === "/image/{prompt}" || endpoint.startsWith("/v1/images/")
+    )
+  );
+}
+
+function mergeModelMetadata(
+  primaryModels: PollinationsModel[],
+  secondaryModels: PollinationsModel[]
+): PollinationsModel[] {
+  if (secondaryModels.length === 0) {
+    return mergeDuplicateModels(primaryModels);
+  }
+
+  const secondaryLookup = createModelLookup(secondaryModels);
+  const mergedPrimary = primaryModels.map((primaryModel) => {
+    const match = collectModelKeys(primaryModel)
+      .map((key) => secondaryLookup.get(key))
+      .find(isDefined);
+
+    return mergeModel(primaryModel, match);
+  });
+
+  const knownKeys = new Set(
+    mergedPrimary.flatMap((model) => collectModelKeys(model))
+  );
+  const unmatchedSecondary = secondaryModels.filter(
+    (model) => !collectModelKeys(model).some((key) => knownKeys.has(key))
+  );
+
+  return mergeDuplicateModels([...mergedPrimary, ...unmatchedSecondary]);
+}
+
+function mergeDuplicateModels(models: PollinationsModel[]): PollinationsModel[] {
+  const deduped = new Map<string, PollinationsModel>();
+
+  for (const model of models) {
+    const existing = deduped.get(model.name);
+    deduped.set(model.name, existing ? mergeModel(existing, model) : model);
+  }
+
+  return Array.from(deduped.values());
+}
+
+function mergeModel(
+  primaryModel: PollinationsModel,
+  secondaryModel?: PollinationsModel
+): PollinationsModel {
+  if (!secondaryModel) return primaryModel;
+
+  return {
+    name: primaryModel.name,
+    aliases: dedupeStrings([
+      ...primaryModel.aliases,
+      ...secondaryModel.aliases,
+    ]),
+    description: primaryModel.description ?? secondaryModel.description,
+    pricing: primaryModel.pricing ?? secondaryModel.pricing,
+    input_modalities: dedupeStrings([
+      ...primaryModel.input_modalities,
+      ...secondaryModel.input_modalities,
+    ]),
+    output_modalities: dedupeStrings([
+      ...primaryModel.output_modalities,
+      ...secondaryModel.output_modalities,
+    ]),
+    supported_endpoints: dedupeStrings([
+      ...primaryModel.supported_endpoints,
+      ...secondaryModel.supported_endpoints,
+    ]),
+    reasoning: primaryModel.reasoning ?? secondaryModel.reasoning,
+    is_specialized: primaryModel.is_specialized ?? secondaryModel.is_specialized,
+    paid_only: primaryModel.paid_only ?? secondaryModel.paid_only,
+  };
+}
+
+function createModelLookup(
+  models: PollinationsModel[]
+): Map<string, PollinationsModel> {
+  const lookup = new Map<string, PollinationsModel>();
+
+  for (const model of models) {
+    for (const key of collectModelKeys(model)) {
+      if (!lookup.has(key)) {
+        lookup.set(key, model);
+      }
+    }
+  }
+
+  return lookup;
+}
+
+function collectModelKeys(model: PollinationsModel): string[] {
+  return dedupeStrings([model.name, ...model.aliases].map(normalizeLookupKey));
+}
+
+function normalizeLookupKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter(Boolean))
+  );
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => readString(entry))
+    .filter((entry): entry is string => Boolean(entry));
+}
+
+function readString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function collectModelFetchErrorMessages(
+  ...results: PromiseSettledResult<PollinationsModel[]>[]
+): string {
+  return results
+    .filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    )
+    .map((result) =>
+      result.reason instanceof Error ? result.reason.message : String(result.reason)
+    )
+    .join(" | ");
+}
+
+function isDefined<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
 }
 
 function selectTextModelSpread(
@@ -467,6 +746,7 @@ function getRejectedTextReason(model: PollinationsModel): string | null {
 }
 
 function getRejectedImageReason(model: PollinationsModel): string | null {
+  if (BLOCKED_IMAGE_MODEL_IDS.has(model.name)) return "blocked";
   const inputModalities = model.input_modalities ?? [];
   const outputModalities = model.output_modalities ?? [];
   if (!inputModalities.includes("text")) return "missing_text_input";

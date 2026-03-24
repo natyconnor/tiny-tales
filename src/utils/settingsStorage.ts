@@ -10,7 +10,7 @@ export type UserSettings = {
 export const DEFAULT_SETTINGS: UserSettings = {
   maxLetters: 5,
   model: "openai",
-  imageModel: "gptimage",
+  imageModel: "grok-imagine",
   allCaps: false,
 };
 
@@ -19,7 +19,12 @@ export function loadSettings(): UserSettings {
     const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as Partial<UserSettings>;
-      return { ...DEFAULT_SETTINGS, ...parsed };
+      const imageModel =
+        parsed.imageModel === "gptimage" ||
+        parsed.imageModel === "gptimage-large"
+          ? "grok-imagine"
+          : parsed.imageModel ?? DEFAULT_SETTINGS.imageModel;
+      return { ...DEFAULT_SETTINGS, ...parsed, imageModel };
     }
   } catch {
     console.error("Failed to load settings from localStorage");

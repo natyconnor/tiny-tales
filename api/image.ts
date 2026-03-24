@@ -42,15 +42,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const configuredPollinationsKey = process.env.POLLINATIONS_API_KEY?.trim();
-    if (configuredPollinationsKey) {
-      params.set("key", configuredPollinationsKey);
+    const upstreamPollinationsKey =
+      payload.pollinationsApiKey ?? configuredPollinationsKey;
+    if (!upstreamPollinationsKey) {
+      return res.status(503).json({
+        error:
+          "Image generation requires a Pollinations API key. Configure POLLINATIONS_API_KEY or connect Pollinations before generating images.",
+      });
     }
 
     const upstreamUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(
       payload.prompt
     )}?${params.toString()}`;
 
-    const upstreamResponse = await fetch(upstreamUrl);
+    const upstreamResponse = await fetch(upstreamUrl, {
+      headers: {
+        Authorization: `Bearer ${upstreamPollinationsKey}`,
+      },
+    });
     if (!upstreamResponse.ok) {
       const detail = (await upstreamResponse.text()).slice(0, 500);
       return res.status(upstreamResponse.status).json({

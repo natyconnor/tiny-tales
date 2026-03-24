@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 
 import { api } from "../convex/_generated/api";
 import AppHeader from "./components/AppHeader";
+import DebugPanel from "./components/DebugPanel";
 import ExportPrintContainer from "./components/ExportPrintContainer";
 import BookletPrintContainer from "./components/BookletPrintContainer";
 import ExportPreviewModal from "./components/ExportPreviewModal";
@@ -31,10 +32,13 @@ import { captureLoadedImagesFromDom } from "./utils/imageCapture";
 import { renderExportCanvas } from "./utils/exportCanvas";
 import { splitStoryIntoSegments } from "./utils/storySegments";
 import { renderBookletDataUrl } from "./utils/bookletCanvas";
+import { useDebugLog } from "./hooks/useDebugLog";
 import { usePollinations } from "./hooks/usePollinations";
 import { IMAGE_SAFETY_HINT, useStoryImages } from "./hooks/useStoryImages";
 import { useStoryHistory } from "./hooks/useStoryHistory";
 import { loadSettings, type UserSettings } from "./utils/settingsStorage";
+
+const IS_DEV = import.meta.env.DEV;
 
 function slugifyTopic(value: string): string {
   return value
@@ -159,6 +163,8 @@ function App() {
     refreshPollinationsUsage,
     connectPollinations,
   } = usePollinations({ model, imageModel, setModel, setImageModel });
+
+  const debugLog = useDebugLog();
 
   const { showOnboarding, completeOnboarding } = useOnboarding();
   const {
@@ -375,28 +381,57 @@ function App() {
     setBookletPreviewUrl(null);
 
     try {
+      const requestBody = {
+        topic: trimmedTopic,
+        maxLetters,
+        model,
+        imageModel,
+        pollinationsApiKey: usablePollinationsApiKey,
+      };
+      const fetchStart = Date.now();
+
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         signal: controller.signal,
-        body: JSON.stringify({
-          topic: trimmedTopic,
-          maxLetters,
-          model,
-          imageModel,
-          pollinationsApiKey: usablePollinationsApiKey,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        if (IS_DEV) {
+          debugLog.push({
+            type: "generate",
+            label: `Generate: "${trimmedTopic}" — FAILED (${response.status})`,
+            durationMs: Date.now() - fetchStart,
+            request: { url: "/api/generate", method: "POST", body: requestBody },
+            response: { status: response.status, body: errorData },
+            error: errorData.error || `HTTP ${response.status}`,
+          });
+        }
         throw new Error(errorData.error || "Something went wrong");
       }
 
       const data = await response.json();
       if (requestId !== generationRequestIdRef.current) return;
+
+      if (IS_DEV) {
+        debugLog.push({
+          type: "generate",
+          label: `Generate: "${trimmedTopic}"`,
+          durationMs: Date.now() - fetchStart,
+          request: { url: "/api/generate", method: "POST", body: requestBody },
+          response: { status: response.status, body: data },
+          meta: {
+            storyLength: data.story?.length,
+            imagePromptCount: data.imagePrompts?.length,
+            model: data.debug?.model,
+            imageModel: data.debug?.imageModel,
+          },
+        });
+      }
 
       console.log("=== Story Generation Debug ===");
       console.log("Story length:", data.story?.length, "chars");
@@ -828,6 +863,8 @@ function App() {
           </p>
         </motion.footer>
       </div>
+
+      {IS_DEV && <DebugPanel />}
     </div>
   );
 }

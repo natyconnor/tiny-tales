@@ -36,16 +36,20 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
    ```
    This creates a Convex project, deploys the schema, and adds `VITE_CONVEX_URL` to `.env.local`. Keep this running in one terminal.
 
-3. **Add API keys** (optional but recommended)
+3. **Add Pollinations auth** (required for generation)
 
    Edit `.env.local` and add:
    ```env
-   # Pollinations API for AI text + server-proxied image generation
+   # Shared/server Pollinations API key for text + image generation
    POLLINATIONS_API_KEY=your_pollinations_api_key_here
-   # Recommended: stable secret for signed /api/image tokens
+   # Strongly recommended in dev, required in production for stable signed /api/image tokens
    IMAGE_PROXY_SIGNING_SECRET=your_random_long_secret_here
    ```
-   Get a key at [Pollinations](https://pollinations.ai/).
+   Tiny Tales needs a Pollinations API key for story + image generation. You have two ways to provide one:
+   - Set `POLLINATIONS_API_KEY` to enable shared/server-side generation.
+   - Or leave `POLLINATIONS_API_KEY` unset and connect a personal Pollinations key in the app before generating.
+
+   Get a key at [Pollinations](https://enter.pollinations.ai/).
 
 4. **Start the app** (in a second terminal)
    ```bash
@@ -58,6 +62,9 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 - **Terminals**: You need `npx convex dev` (Convex backend) and `pnpm dev:all` (frontend + API) running
 - **Alternative**: Run `pnpm dev:api` and `pnpm dev` separately if you prefer
 - **API port**: Override with `API_PORT` env variable
+- **Generation auth**:
+  - With `POLLINATIONS_API_KEY` set, the app can generate with shared/server credits.
+  - Without it, users must connect their own Pollinations key in the UI before generating stories or images.
 - **Shared balance toggle**:
   - Open with `?showSharedBalance=true` to show shared pollen balance and persist it in a cookie
   - Open with `?showSharedBalance=false` to hide it again
@@ -70,8 +77,8 @@ Deploy to **Vercel** (configured via `vercel.json`):
 1. Push to GitHub and import the project in [Vercel](https://vercel.com)
 2. Add environment variables:
    - `VITE_CONVEX_URL` — from your Convex dashboard (deploy with `npx convex deploy`)
-   - `POLLINATIONS_API_KEY` — for AI generation
-   - `IMAGE_PROXY_SIGNING_SECRET` — secret used to sign internal image proxy URLs
+   - `POLLINATIONS_API_KEY` — optional only if every user will connect their own Pollinations key; required for shared generation and shared balance
+   - `IMAGE_PROXY_SIGNING_SECRET` — required secret used to sign and encrypt internal image proxy tokens
 3. Deploy; Vercel builds the frontend and runs the API serverless function
 
 Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.

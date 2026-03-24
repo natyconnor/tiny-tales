@@ -1,23 +1,55 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from "crypto";
 
-type ImageProxyPayload = {
+type LegacyImageProxyPayload = {
   version: 1;
   prompt: string;
   model: string;
 };
 
-export function createImageProxyToken(prompt: string, model: string): string {
+type ImageProxyPayload = {
+  version: 2;
+  prompt: string;
+  model: string;
+  keySource: "server" | "user";
+  encryptedApiKey?: string;
+};
+
+type ParsedImageProxyPayload = {
+  prompt: string;
+  model: string;
+  keySource: "server" | "user";
+  pollinationsApiKey?: string;
+};
+
+export function createImageProxyToken(
+  prompt: string,
+  model: string,
+  pollinationsApiKey?: string
+): string {
   const payload: ImageProxyPayload = {
-    version: 1,
+    version: 2,
     prompt,
     model,
+    keySource: pollinationsApiKey ? "user" : "server",
+    encryptedApiKey: pollinationsApiKey
+      ? encryptApiKey(pollinationsApiKey)
+      : undefined,
   };
   const encodedPayload = encodeBase64Url(JSON.stringify(payload));
   const signature = createSignature(encodedPayload);
   return `${encodedPayload}.${signature}`;
 }
 
-export function parseImageProxyToken(token: string): ImageProxyPayload | null {
+export function parseImageProxyToken(
+  token: string
+): ParsedImageProxyPayload | null {
   const separatorIndex = token.indexOf(".");
   if (separatorIndex <= 0 || separatorIndex >= token.length - 1) {
     return null;
@@ -33,22 +65,56 @@ export function parseImageProxyToken(token: string): ImageProxyPayload | null {
 
   try {
     const rawJson = decodeBase64Url(encodedPayload).toString("utf8");
-    const parsed = JSON.parse(rawJson) as Partial<ImageProxyPayload>;
+    const parsed = JSON.parse(rawJson) as
+      | Partial<LegacyImageProxyPayload>
+      | Partial<ImageProxyPayload>;
 
-    if (
-      parsed.version !== 1 ||
-      typeof parsed.prompt !== "string" ||
-      !parsed.prompt.trim() ||
-      typeof parsed.model !== "string" ||
-      !parsed.model.trim()
-    ) {
+    const prompt =
+      typeof parsed.prompt === "string" ? parsed.prompt.trim() : undefined;
+    const model =
+      typeof parsed.model === "string" ? parsed.model.trim() : undefined;
+    if (!prompt || !model) {
+      return null;
+    }
+
+    if (parsed.version === 1) {
+      return {
+        prompt,
+        model,
+        keySource: "server",
+      };
+    }
+
+    if (parsed.version !== 2) {
+      return null;
+    }
+
+    if (parsed.keySource !== "server" && parsed.keySource !== "user") {
+      return null;
+    }
+
+    if (parsed.keySource === "server") {
+      return {
+        prompt,
+        model,
+        keySource: "server",
+      };
+    }
+
+    if (typeof parsed.encryptedApiKey !== "string" || !parsed.encryptedApiKey) {
+      return null;
+    }
+
+    const decryptedApiKey = decryptApiKey(parsed.encryptedApiKey);
+    if (!decryptedApiKey) {
       return null;
     }
 
     return {
-      version: 1,
-      prompt: parsed.prompt,
-      model: parsed.model,
+      prompt,
+      model,
+      keySource: "user",
+      pollinationsApiKey: decryptedApiKey,
     };
   } catch {
     return null;
@@ -70,6 +136,44 @@ function getSigningSecret(): string {
 
   // Local/dev fallback when no API key is configured.
   return "tiny-tales-image-proxy-dev-secret";
+}
+
+function encryptApiKey(apiKey: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(apiKey, "utf8"),
+    cipher.final(),
+  ]);
+  const authTag = cipher.getAuthTag();
+
+  return Buffer.concat([iv, authTag, ciphertext]).toString("base64url");
+}
+
+function decryptApiKey(value: string): string | null {
+  try {
+    const payload = Buffer.from(value, "base64url");
+    if (payload.length <= 28) return null;
+
+    const iv = payload.subarray(0, 12);
+    const authTag = payload.subarray(12, 28);
+    const ciphertext = payload.subarray(28);
+    const decipher = createDecipheriv("aes-256-gcm", getEncryptionKey(), iv);
+    decipher.setAuthTag(authTag);
+
+    const decrypted = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]).toString("utf8");
+    const trimmed = decrypted.trim();
+    return trimmed || null;
+  } catch {
+    return null;
+  }
+}
+
+function getEncryptionKey(): Buffer {
+  return createHash("sha256").update(getSigningSecret()).digest();
 }
 
 function safeCompare(left: string, right: string): boolean {

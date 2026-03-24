@@ -77,6 +77,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .json({ error: "Maximum letters must be between 3 and 8" });
     }
 
+    if (!pollinationsKey) {
+      return res.status(503).json({
+        error:
+          "Pollinations API key required. Configure POLLINATIONS_API_KEY for shared mode or connect your own Pollinations account.",
+      });
+    }
+
     const curatedCatalog = await getCuratedModelCatalog();
     const allowedTextModels = curatedCatalog.textModels.map((item) => item.id);
     const allowedImageModels = curatedCatalog.imageModels.map(
@@ -235,6 +242,8 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 
     const pollinationsData = (await pollinationsResponse.json()) as {
       choices: Array<{ message: { content: string } }>;
+      model?: string;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
     };
     log("Pollinations API responded");
     const responseText =
@@ -302,9 +311,16 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 
     // Build proxy URLs so API keys never appear in client-visible URLs
     const imageUrls = imagePrompts.map((prompt, i) =>
-      buildImageProxyUrl(prompt, imageModelName, i === 0 ? log : undefined)
+      buildImageProxyUrl(
+        prompt,
+        imageModelName,
+        byopPollinationsKey,
+        i === 0 ? log : undefined
+      )
     );
     log(`Generated ${imageUrls.length} proxied image URLs`);
+
+    const isDevMode = process.env.NODE_ENV !== "production" && !process.env.VERCEL;
 
     return res.status(200).json({
       title,
@@ -319,6 +335,12 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
         textApi: "pollinations",
         pollinationsKeyConfigured: !!pollinationsKey,
         usingByopKey: !!byopPollinationsKey,
+        ...(isDevMode && {
+          fullPrompt: prompt,
+          rawResponse: responseText,
+          pollinationsUsage: pollinationsData.usage ?? null,
+          pollinationsModel: pollinationsData.model ?? null,
+        }),
       },
     });
   } catch (error) {
@@ -423,7 +445,7 @@ function getSkillLevelGuidance(maxLetters: number): {
   switch (maxLetters) {
     case 3:
       return {
-        sentenceLength: "2-4 words per sentence",
+        sentenceLength: "3-5 words per sentence",
         sentenceCount: "4-6 very short sentences total",
         grammarNotes: `CRITICAL: Always include small articles and words like "a", "the", "is", "it", "to", "in", "on", "up" - these are all ${maxLetters} letters or fewer and make sentences readable! Don't skip articles to save space. Fragments like "Big sun!" or "A red cat." are perfect.`,
         exampleSentences: `
@@ -525,9 +547,10 @@ GOOD examples for 8-letter limit:
 function buildImageProxyUrl(
   prompt: string,
   model: string,
+  pollinationsApiKey?: string,
   log?: (msg: string) => void
 ): string {
-  const token = createImageProxyToken(prompt, model);
+  const token = createImageProxyToken(prompt, model, pollinationsApiKey);
   const params = new URLSearchParams({ token });
 
   const url = `/api/image?${params.toString()}`;

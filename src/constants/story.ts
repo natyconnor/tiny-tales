@@ -32,8 +32,8 @@ export const DEFAULT_AVAILABLE_MODELS: ModelOption[] = [
 
 export const DEFAULT_IMAGE_MODELS: ModelOption[] = [
   {
-    id: "gptimage",
-    name: "GPT Image 1 Mini",
+    id: "grok-imagine",
+    name: "Grok Imagine",
     description: "Best value image quality",
   },
   {
@@ -42,9 +42,9 @@ export const DEFAULT_IMAGE_MODELS: ModelOption[] = [
     description: "Balanced quality and price",
   },
   {
-    id: "klein-large",
-    name: "FLUX.2 Klein 9B",
-    description: "Higher quality option",
+    id: "qwen-image",
+    name: "Qwen Image Plus",
+    description: "Alternative high-quality style",
   },
 ];
 

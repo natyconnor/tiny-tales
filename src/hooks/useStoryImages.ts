@@ -12,6 +12,9 @@ import {
   captureImageToDataUrl,
   captureLoadedImagesFromDom,
 } from "../utils/imageCapture";
+import { pushDebugEntry } from "./useDebugLog";
+
+const IS_DEV = import.meta.env.DEV;
 
 const IMAGE_RETRY_HINT_MS = 15000;
 const IMAGE_SAFETY_REJECTION_PATTERNS = [
@@ -194,6 +197,7 @@ export function useStoryImages({
 
       const controller = new AbortController();
       pendingImageRequestsRef.current[index] = controller;
+      const fetchStart = Date.now();
 
       setIsRequestingImages((prev) => {
         const updated = [...prev];
@@ -216,6 +220,16 @@ export function useStoryImages({
           const imageBlob = await response.blob();
           if (controller.signal.aborted || imageUrlsRef.current[index] !== url) {
             return;
+          }
+
+          if (IS_DEV) {
+            pushDebugEntry({
+              type: "image",
+              label: `Image ${index + 1}: loaded (${(imageBlob.size / 1024).toFixed(0)} KB)`,
+              durationMs: Date.now() - fetchStart,
+              request: { url, method: "GET" },
+              response: { status: response.status, body: { contentType, sizeBytes: imageBlob.size } },
+            });
           }
 
           const blobUrl = URL.createObjectURL(imageBlob);
@@ -270,6 +284,18 @@ export function useStoryImages({
           ? "Image service had an error. You can retry this image."
           : "Image could not be generated for this scene. You can retry this image.";
 
+        if (IS_DEV) {
+          pushDebugEntry({
+            type: "image",
+            label: `Image ${index + 1}: ${blockedBySafety ? "BLOCKED" : "FAILED"} (${response.status})`,
+            durationMs: Date.now() - fetchStart,
+            request: { url, method: "GET" },
+            response: { status: response.status, body: { detail: failureDetail, contentType } },
+            error: failureMessage,
+            meta: { blockedBySafety },
+          });
+        }
+
         const previousBlobUrl = imageObjectUrlsRef.current[index];
         revokeObjectUrl(previousBlobUrl);
         imageObjectUrlsRef.current[index] = null;
@@ -321,6 +347,16 @@ export function useStoryImages({
 
         if (imageUrlsRef.current[index] !== url) {
           return;
+        }
+
+        if (IS_DEV) {
+          pushDebugEntry({
+            type: "image",
+            label: `Image ${index + 1}: network error`,
+            durationMs: Date.now() - fetchStart,
+            request: { url, method: "GET" },
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         const previousBlobUrl = imageObjectUrlsRef.current[index];
