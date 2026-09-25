@@ -54,9 +54,10 @@ export const LETTER_LABELS = [
 ];
 
 /**
- * Prompt ideas organized by word length (skill level)
- * Each prompt includes action/conflict and potential for a lesson
- * Simpler topics for shorter word limits, more complex for longer
+ * Prompt ideas organized by reading level.
+ * Subjects and names stay stage-friendly (cat, frog, Kim) so the story
+ * can be written with simple words. The plot and imagery can use any
+ * language — "learns to be brave" is fine even at 3 letters.
  */
 export const PROMPT_IDEAS: Record<number, { emoji: string; ideas: string[] }> =
   {
@@ -75,55 +76,55 @@ export const PROMPT_IDEAS: Record<number, { emoji: string; ideas: string[] }> =
       emoji: "🐥",
       ideas: [
         "A duck who helps a lost baby bird find home",
-        "A bear who learns to share his food",
         "A frog who is scared to jump but tries anyway",
-        "A lazy snail who wins a race by not giving up",
-        "A rude goat who learns to be kind",
-        "A tiny fish who saves the pond from trash",
+        "A pup who learns to share his food",
+        "A duck and a frog who become friends at the pond",
+        "A bug who gets lost and finds a kind hand",
+        "A goat who learns to be kind",
       ],
     },
     5: {
       emoji: "🐰",
       ideas: [
         "A bunny who overcomes stage fright to dance",
-        "A mouse who stands up to a mean cat",
-        "A robot who learns that mistakes help us grow",
+        "A puppy who stands up to a mean cat",
         "A whale who cleans the ocean and inspires others",
-        "A panda who learns patience while learning to cook",
         "A fox who discovers honesty is the best policy",
+        "A moth who is afraid of the dark",
+        "Kim who learns that mistakes help us bake",
       ],
     },
     6: {
       emoji: "🦊",
       ideas: [
-        "A dragon who learns being different is special",
-        "A pirate who returns stolen treasure and finds real riches",
         "A kitten who starts a garden to help hungry friends",
-        "A wizard who admits a mistake and fixes it together",
-        "A lonely robot who learns friendship takes effort",
-        "A squirrel who saves for winter and helps neighbors too",
+        "A rabbit who is afraid of the rain and finds courage",
+        "A lonely bird who learns friendship takes effort",
+        "A picnic that goes wrong and still ends happily",
+        "A boat that gets lost and finds its way home",
+        "A farm friend who admits a mistake and fixes it",
       ],
     },
     7: {
       emoji: "🦉",
       ideas: [
-        "A penguin who explores but learns home is where the heart is",
-        "A unicorn who stumbles but keeps trying until she sparkles",
-        "A grumpy cloud who discovers joy in helping flowers grow",
-        "A knight who befriends a dragon instead of fighting",
-        "A bookworm who learns adventures happen outside books too",
-        "A timid owl who finds courage to speak up for friends",
+        "A curious kitten who is scared of a sound outside",
+        "A whisper in the garden that turns out to be a friend",
+        "A rainbow after a storm that cheers everyone up",
+        "A boy who loses his toy mouse and learns to ask for help",
+        "A picnic spoiled by rain that becomes an indoor adventure",
+        "A shy mouse who finds courage to speak up",
       ],
     },
     8: {
       emoji: "🦋",
       ideas: [
-        "A dinosaur who travels through time and learns to appreciate the present",
-        "A princess who proves girls can be scientists and heroes",
-        "A vegetable garden that teaches a picky eater to try new things",
-        "An elephant and ladybug who show that size doesn't define friendship",
-        "A spaceship captain who conquers fear of the dark with a friend's help",
-        "A young inventor whose failed experiment leads to an amazing discovery",
+        "An elephant who feels too big and finds a tiny friend",
+        "A bird who is afraid of the dark until a firefly helps",
+        "Friends who find treasure and learn sharing matters more",
+        "A birthday picnic that almost fails and becomes the best day",
+        "A firefly who thinks its light is too small to matter",
+        "An elephant and a bird who show that size doesn't define friendship",
       ],
     },
   };

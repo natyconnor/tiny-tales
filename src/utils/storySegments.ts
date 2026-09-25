@@ -36,6 +36,14 @@ export const splitStoryIntoSegments = (
   text: string,
   numSegments: number
 ): string[] => {
+  const pages = text
+    .split(/\n\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (pages.length > 1 && pages.length <= numSegments) {
+    return pages;
+  }
+
   const sentences = getSentences(text);
 
   // If fewer sentences than segments, give each sentence its own segment

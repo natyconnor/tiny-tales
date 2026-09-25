@@ -20,7 +20,7 @@ export const INITIAL_TUTORIAL_STEPS: TutorialStep[] = [
     id: "prompt",
     title: "What's Your Story About?",
     description:
-      "Type anything you'd like your story to be about! It helps to keep the subjects within your word limit but otherwise let your imagination run wild! Click the lightbulb for prompt ideas.",
+      "Type anything you'd like your story to be about! Keep the characters simple at lower letter limits — the plot can be as rich as you like. Click the lightbulb for ideas.",
     emoji: "🌟",
     targetSelector: "[data-tutorial='prompt']",
     position: "bottom",
@@ -29,7 +29,7 @@ export const INITIAL_TUTORIAL_STEPS: TutorialStep[] = [
     id: "word-length",
     title: "Choose Your Reading Level",
     description:
-      "Slide to pick the maximum letters per word. Smaller numbers (3-4) are great for beginning readers with simple words. Bigger numbers (6-8) allow more complex vocabulary for confident readers!",
+      "Slide to pick the maximum letters per word. Smaller numbers (3-4) use short, simple sounds like cat and frog. Bigger numbers (6-8) add blends and longer words for confident readers!",
     emoji: "📏",
     targetSelector: "[data-tutorial='word-length']",
     position: "bottom",
