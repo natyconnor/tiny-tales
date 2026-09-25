@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { generateText } from "ai";
 import {
-  DEFAULT_IMAGE_MODELS,
-  DEFAULT_TEXT_MODELS,
-  getCuratedModelCatalog,
-} from "./pollinationsCatalog.js";
+  resolveImageModelId,
+  resolveTextModelId,
+} from "./modelCatalog.js";
 import { createImageProxyToken } from "./imageProxyToken.js";
+import { getStoryBudget, hasGatewayAuth } from "./storyBudget.js";
 
-// Vercel serverless types
 interface VercelRequest extends IncomingMessage {
   query: Record<string, string | string[]>;
   cookies: Record<string, string>;
@@ -23,28 +23,6 @@ interface RequestBody {
   maxLetters: number;
   model?: string;
   imageModel?: string;
-  pollinationsApiKey?: string;
-}
-
-type PollinationsErrorBody = {
-  status?: number;
-  success?: boolean;
-  error?: {
-    code?: string;
-    message?: string;
-  };
-};
-
-function parsePollinationsError(text: string): PollinationsErrorBody | null {
-  try {
-    const parsed = JSON.parse(text) as PollinationsErrorBody;
-    if (parsed && typeof parsed === "object" && parsed.error) {
-      return parsed;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -54,40 +32,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   log("Handler started");
 
-  // Only allow POST requests
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  log("Using Pollinations for text");
-
-  // Optional server-side Pollinations API key
-  const configuredPollinationsKey = process.env.POLLINATIONS_API_KEY;
-
-  if (configuredPollinationsKey) {
-    log("Server POLLINATIONS_API_KEY is configured");
+  if (!hasGatewayAuth()) {
+    return res.status(503).json({
+      error:
+        "AI Gateway is not configured. Set AI_GATEWAY_API_KEY (or run vercel env pull for OIDC).",
+      code: "GATEWAY_NOT_CONFIGURED",
+    });
   }
 
   try {
-    // In Node.js serverless, body is already parsed
     const body = req.body as RequestBody;
     const {
       topic,
       maxLetters,
       model: requestedModel,
       imageModel: requestedImageModel,
-      pollinationsApiKey: requestedPollinationsApiKey,
     } = body;
-
-    const byopPollinationsKey = sanitizeApiKey(requestedPollinationsApiKey);
-    const pollinationsKey = byopPollinationsKey ?? configuredPollinationsKey;
 
     log(
       `Request body parsed: topic="${topic}", maxLetters=${maxLetters}, model=${requestedModel}, imageModel=${requestedImageModel}`
     );
-    log(`Using BYOP key: ${byopPollinationsKey ? "yes" : "no"}`);
 
-    // Validate input
     if (!topic || typeof topic !== "string") {
       return res.status(400).json({ error: "Please provide a story topic!" });
     }
@@ -98,45 +67,199 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .json({ error: "Maximum letters must be between 3 and 8" });
     }
 
-    if (!pollinationsKey) {
-      return res.status(503).json({
+    const budget = await getStoryBudget(requestedModel, requestedImageModel);
+    if (budget.remainingUsd !== null && budget.remainingUsd <= 0) {
+      return res.status(402).json({
         error:
-          "Pollinations API key required. Configure POLLINATIONS_API_KEY for shared mode or connect your own Pollinations account.",
+          "AI credits are exhausted. Add AI Gateway credits in your Vercel dashboard, or wait for the monthly free credit to refresh.",
+        code: "PAYMENT_REQUIRED",
+        budget,
       });
     }
 
-    const curatedCatalog = await getCuratedModelCatalog();
-    const allowedTextModels = curatedCatalog.textModels.map((item) => item.id);
-    const allowedImageModels = curatedCatalog.imageModels.map(
-      (item) => item.id
-    );
-    const defaultTextModel = allowedTextModels[0] ?? DEFAULT_TEXT_MODELS[0].id;
-    const defaultImageModel =
-      allowedImageModels[0] ?? DEFAULT_IMAGE_MODELS[0].id;
-
-    const requestedTextModel =
-      requestedModel && allowedTextModels.includes(requestedModel)
-        ? requestedModel
-        : defaultTextModel;
-
-    const requestedImageModelId =
-      requestedImageModel && allowedImageModels.includes(requestedImageModel)
-        ? requestedImageModel
-        : defaultImageModel;
-
-    // Use Pollinations model directly
-    const modelName = requestedTextModel;
+    const modelName = resolveTextModelId(requestedModel);
+    const imageModelName = resolveImageModelId(requestedImageModel);
     log(`Using text model: ${modelName}`);
-
-    // Use requested image model if valid, otherwise default to curated best-value option
-    const imageModelName = requestedImageModelId;
     log(`Using image model: ${imageModelName}`);
 
-    // Get skill-level-specific guidance
     const skillGuidance = getSkillLevelGuidance(maxLetters);
+    const prompt = buildStoryPrompt(topic, maxLetters, skillGuidance);
 
-    // Create the prompt - requesting JSON with title + story + character descriptions + image prompts
-    const prompt = `Create a simple, fun children's story about "${topic}" with a title, detailed character descriptions, and 4 illustration prompts.
+    log("Calling AI Gateway...");
+    let responseText = "";
+    try {
+      const result = await generateText({
+        model: modelName,
+        prompt,
+        temperature: 0.8,
+      });
+      responseText = result.text.trim();
+      log(
+        `AI Gateway responded (${result.usage?.totalTokens ?? "?"} tokens)`
+      );
+    } catch (error) {
+      return handleGatewayError(res, error, log);
+    }
+
+    log(`Response received: ${responseText.length} chars`);
+
+    let parsed: {
+      title?: string;
+      story: string;
+      characters?: Record<string, string>;
+      imagePrompts: string[];
+    };
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      try {
+        const cleanJson = responseText
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```$/i, "")
+          .trim();
+        parsed = JSON.parse(cleanJson);
+      } catch {
+        log("Failed to parse JSON response, using raw text as story");
+        parsed = {
+          story: responseText,
+          imagePrompts: [],
+        };
+      }
+    }
+
+    if (!parsed.story || typeof parsed.story !== "string") {
+      throw new Error("Invalid response: missing story text");
+    }
+
+    const title = parsed.title?.trim() || topic;
+    log(`Title: "${title}"`);
+
+    const imagePrompts = Array.isArray(parsed.imagePrompts)
+      ? parsed.imagePrompts.slice(0, 4)
+      : [];
+
+    if (parsed.characters) {
+      log(`Characters defined: ${Object.keys(parsed.characters).join(", ")}`);
+    }
+
+    log(
+      `Story generated: ${parsed.story.length} chars, ${imagePrompts.length} image prompts`
+    );
+
+    const imageUrls = imagePrompts.map((imagePrompt) =>
+      buildImageProxyUrl(imagePrompt, imageModelName)
+    );
+    log(`Generated ${imageUrls.length} proxied image URLs`);
+
+    const isDevMode =
+      process.env.NODE_ENV !== "production" && !process.env.VERCEL;
+
+    return res.status(200).json({
+      title,
+      story: parsed.story,
+      characters: parsed.characters || {},
+      imagePrompts,
+      imageUrls,
+      budget,
+      debug: {
+        time: Date.now() - startTime,
+        model: modelName,
+        imageModel: imageModelName,
+        textApi: "ai-gateway",
+        gatewayConfigured: hasGatewayAuth(),
+        ...(isDevMode && {
+          fullPrompt: prompt,
+          rawResponse: responseText,
+        }),
+      },
+    });
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    log(`ERROR after ${elapsed}ms: ${error}`);
+
+    if (error instanceof SyntaxError) {
+      return res.status(400).json({ error: "Invalid request format" });
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({
+      error: `Story generation failed after ${elapsed}ms: ${errorMessage.slice(
+        0,
+        200
+      )}`,
+    });
+  }
+}
+
+function handleGatewayError(
+  res: VercelResponse,
+  error: unknown,
+  log: (msg: string) => void
+) {
+  const message = error instanceof Error ? error.message : String(error);
+  log(`AI Gateway error: ${message}`);
+
+  const lower = message.toLowerCase();
+  const isPaymentError =
+    lower.includes("402") ||
+    lower.includes("payment_required") ||
+    lower.includes("payment required") ||
+    lower.includes("insufficient credit") ||
+    lower.includes("insufficient funds") ||
+    lower.includes("insufficient balance") ||
+    (lower.includes("credit") &&
+      (lower.includes("exhausted") ||
+        lower.includes("empty") ||
+        lower.includes("out of")));
+
+  if (isPaymentError) {
+    return res.status(402).json({
+      error:
+        "AI credits are exhausted. Add free-tier usage later this month, or top up AI Gateway credits in your Vercel dashboard.",
+      code: "PAYMENT_REQUIRED",
+    });
+  }
+
+  if (
+    lower.includes("403") ||
+    lower.includes("forbidden") ||
+    lower.includes("restricted") ||
+    lower.includes("not available") ||
+    lower.includes("free tier")
+  ) {
+    return res.status(403).json({
+      error:
+        "This story model is not available on the free AI Gateway tier right now. Try Gemini Flash Lite instead.",
+      code: "MODEL_UNAVAILABLE",
+    });
+  }
+
+  if (lower.includes("401") || lower.includes("unauthorized")) {
+    return res.status(401).json({
+      error: "AI Gateway authentication failed. Check AI_GATEWAY_API_KEY.",
+      code: "UNAUTHORIZED",
+    });
+  }
+
+  if (lower.includes("429") || lower.includes("rate")) {
+    return res.status(429).json({
+      error: "Too many requests right now. Please wait a moment and try again.",
+      code: "RATE_LIMITED",
+    });
+  }
+
+  return res.status(502).json({
+    error: `Story generation failed: ${message.slice(0, 200)}`,
+    code: "UPSTREAM_ERROR",
+  });
+}
+
+function buildStoryPrompt(
+  topic: string,
+  maxLetters: number,
+  skillGuidance: ReturnType<typeof getSkillLevelGuidance>
+): string {
+  return `Create a simple, fun children's story about "${topic}" with a title, detailed character descriptions, and 4 illustration prompts.
 
 === PART 1: TITLE ===
 Create a short, catchy title for this children's book (2-5 words). The title should:
@@ -226,191 +349,9 @@ Return a JSON object with this shape:
     "whimsical watercolor children's book illustration: [full character descriptions] + [scene 3 description]",
     "whimsical watercolor children's book illustration: [full character descriptions] + [scene 4 description]"
   ]
-}`;
+}
 
-    // Generate the story and image prompts
-    // Use Pollinations OpenAI-compatible API
-    log("Calling Pollinations API...");
-    const pollinationsResponse = await fetch(
-      "https://gen.pollinations.ai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(pollinationsKey && {
-            Authorization: `Bearer ${pollinationsKey}`,
-          }),
-        },
-        body: JSON.stringify({
-          model: modelName,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-        }),
-      }
-    );
-
-    if (!pollinationsResponse.ok) {
-      const errorText = await pollinationsResponse.text();
-      log(`Pollinations API error: ${pollinationsResponse.status} - ${errorText}`);
-
-      const parsed = parsePollinationsError(errorText);
-      const upstreamMessage = parsed?.error?.message;
-
-      if (pollinationsResponse.status === 401) {
-        return res.status(401).json({
-          error: upstreamMessage ?? "Pollinations API key is invalid or expired.",
-          code: "UNAUTHORIZED",
-        });
-      }
-
-      if (pollinationsResponse.status === 402) {
-        return res.status(402).json({
-          error: upstreamMessage ?? "Insufficient pollen balance. Top up at enter.pollinations.ai.",
-          code: "PAYMENT_REQUIRED",
-        });
-      }
-
-      if (pollinationsResponse.status === 403) {
-        return res.status(403).json({
-          error: upstreamMessage ?? "API key lacks the required permissions.",
-          code: "FORBIDDEN",
-        });
-      }
-
-      return res.status(pollinationsResponse.status >= 500 ? 502 : pollinationsResponse.status).json({
-        error: upstreamMessage ?? `Pollinations API error (${pollinationsResponse.status}).`,
-        code: parsed?.error?.code ?? "UPSTREAM_ERROR",
-      });
-    }
-
-    const pollinationsData = (await pollinationsResponse.json()) as {
-      choices: Array<{ message: { content: string } }>;
-      model?: string;
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-    };
-    log("Pollinations API responded");
-    const responseText =
-      pollinationsData.choices?.[0]?.message?.content?.trim() ?? "";
-    log(`Response received: ${responseText.length} chars`);
-
-    // Parse the JSON response
-    let parsed: {
-      title?: string;
-      story: string;
-      characters?: Record<string, string>;
-      imagePrompts: string[];
-    };
-    try {
-      parsed = JSON.parse(responseText);
-    } catch {
-      // Fallback: strip markdown fences in case the model ignored response_format
-      try {
-        const cleanJson = responseText
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```$/i, "")
-          .trim();
-        parsed = JSON.parse(cleanJson);
-      } catch {
-        log("Failed to parse JSON response, using raw text as story");
-        parsed = {
-          story: responseText,
-          imagePrompts: [],
-        };
-      }
-    }
-
-    // Validate the parsed response
-    if (!parsed.story || typeof parsed.story !== "string") {
-      throw new Error("Invalid response: missing story text");
-    }
-
-    // Use generated title or fall back to topic
-    const title = parsed.title?.trim() || topic;
-    log(`Title: "${title}"`);
-
-    // Ensure we have exactly 4 image prompts (or empty array as fallback)
-    const imagePrompts = Array.isArray(parsed.imagePrompts)
-      ? parsed.imagePrompts.slice(0, 4)
-      : [];
-
-    // Log characters if present
-    if (parsed.characters) {
-      log(`Characters defined: ${Object.keys(parsed.characters).join(", ")}`);
-      Object.entries(parsed.characters).forEach(([name, desc]) => {
-        log(`  ${name}: ${desc.slice(0, 80)}${desc.length > 80 ? "..." : ""}`);
-      });
-    }
-
-    log(
-      `Story generated: ${parsed.story.length} chars, ${imagePrompts.length} image prompts`
-    );
-
-    // Log each image prompt
-    imagePrompts.forEach((prompt, i) => {
-      log(
-        `Image prompt ${i + 1}: ${prompt.slice(0, 150)}${
-          prompt.length > 150 ? "..." : ""
-        }`
-      );
-    });
-
-    // Build proxy URLs so API keys never appear in client-visible URLs
-    const imageUrls = imagePrompts.map((prompt, i) =>
-      buildImageProxyUrl(
-        prompt,
-        imageModelName,
-        byopPollinationsKey,
-        i === 0 ? log : undefined
-      )
-    );
-    log(`Generated ${imageUrls.length} proxied image URLs`);
-
-    const isDevMode = process.env.NODE_ENV !== "production" && !process.env.VERCEL;
-
-    return res.status(200).json({
-      title,
-      story: parsed.story,
-      characters: parsed.characters || {},
-      imagePrompts,
-      imageUrls,
-      debug: {
-        time: Date.now() - startTime,
-        model: modelName,
-        imageModel: imageModelName,
-        textApi: "pollinations",
-        pollinationsKeyConfigured: !!pollinationsKey,
-        usingByopKey: !!byopPollinationsKey,
-        ...(isDevMode && {
-          fullPrompt: prompt,
-          rawResponse: responseText,
-          pollinationsUsage: pollinationsData.usage ?? null,
-          pollinationsModel: pollinationsData.model ?? null,
-        }),
-      },
-    });
-  } catch (error) {
-    const elapsed = Date.now() - startTime;
-    log(`ERROR after ${elapsed}ms: ${error}`);
-
-    // Handle specific error types
-    if (error instanceof SyntaxError) {
-      return res.status(400).json({ error: "Invalid request format" });
-    }
-
-    // Include error details for debugging
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return res.status(500).json({
-      error: `Story generation failed after ${elapsed}ms: ${errorMessage.slice(
-        0,
-        200
-      )}`,
-    });
-  }
+Return ONLY valid JSON. Do not wrap it in markdown fences.`;
 }
 
 function getExampleWords(maxLetters: number): string {
@@ -481,10 +422,6 @@ function getExampleWords(maxLetters: number): string {
   return (examples[maxLetters] || examples[5]).join(", ");
 }
 
-/**
- * Returns skill-level-specific writing guidance based on word length
- * This adapts the story complexity to match the reader's ability
- */
 function getSkillLevelGuidance(maxLetters: number): {
   sentenceLength: string;
   sentenceCount: string;
@@ -591,31 +528,12 @@ GOOD examples for 8-letter limit:
   }
 }
 
-/**
- * Builds an internal proxy URL so the browser never sees the server API key.
- */
-function buildImageProxyUrl(
-  prompt: string,
-  model: string,
-  pollinationsApiKey?: string,
-  log?: (msg: string) => void
-): string {
-  const token = createImageProxyToken(prompt, model, pollinationsApiKey);
+function buildImageProxyUrl(prompt: string, model: string): string {
+  const token = createImageProxyToken(prompt, model);
   const params = new URLSearchParams({ token });
-
-  const url = `/api/image?${params.toString()}`;
-  if (log) log(`Generated proxied image URL`);
-
-  return url;
+  return `/api/image?${params.toString()}`;
 }
 
-function sanitizeApiKey(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed || undefined;
-}
-
-// Node.js serverless config
 export const config = {
   maxDuration: 60,
 };

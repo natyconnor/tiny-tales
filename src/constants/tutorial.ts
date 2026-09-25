@@ -47,7 +47,7 @@ export const INITIAL_TUTORIAL_STEPS: TutorialStep[] = [
     id: "image-ai",
     title: "Choose Your Illustrator",
     description:
-      "Select which AI creates the pictures for your story. The better models have stricter limits on the number of times they can be used. Each story gets 4 beautiful images!",
+      "Select which AI creates the pictures for your story. Each story gets 4 beautiful images!",
     emoji: "🎨",
     targetSelector: "[data-tutorial='image-ai']",
     position: "top",

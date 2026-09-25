@@ -3,10 +3,9 @@ import cors from "cors";
 import generateHandler from "./api/generate";
 import imageHandler from "./api/image";
 import modelsHandler from "./api/models";
-import sharedBalanceHandler from "./api/sharedBalance";
+import budgetHandler from "./api/budget";
 import * as dotenv from "dotenv";
 
-// Load environment variables from .env.local or .env
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
@@ -17,8 +16,12 @@ type VercelHandler = (
   res: Parameters<typeof generateHandler>[1]
 ) => Promise<void> | void;
 
-// Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const parseCookies = (
@@ -44,13 +47,11 @@ const parseCookies = (
   }, {});
 };
 
-// Convert Express request/response to Vercel format
 const runVercelHandler = async (
   req: express.Request,
   res: express.Response,
   handler: VercelHandler
 ) => {
-  // Create a Vercel-compatible request object
   const vercelReq = {
     method: req.method,
     url: req.url,
@@ -60,7 +61,6 @@ const runVercelHandler = async (
     body: req.body,
   } as Parameters<typeof handler>[0];
 
-  // Create a Vercel-compatible response object
   let statusCode = 200;
   const vercelRes = {
     status: (code: number) => {
@@ -74,7 +74,6 @@ const runVercelHandler = async (
         res.json(body);
       }
     },
-    // Add other methods that might be needed
     setHeader: (name: string, value: string | string[]) => {
       res.setHeader(name, value);
     },
@@ -113,8 +112,8 @@ app.get("/api/image", async (req, res) => {
   await runVercelHandler(req, res, imageHandler);
 });
 
-app.get("/api/shared-balance", async (req, res) => {
-  await runVercelHandler(req, res, sharedBalanceHandler);
+app.get("/api/budget", async (req, res) => {
+  await runVercelHandler(req, res, budgetHandler);
 });
 
 app.listen(PORT, () => {
@@ -122,14 +121,14 @@ app.listen(PORT, () => {
   console.log(`📡 API endpoint: http://localhost:${PORT}/api/generate`);
   console.log(`🧠 Model endpoint: http://localhost:${PORT}/api/models`);
   console.log(`🖼️  Image endpoint: http://localhost:${PORT}/api/image`);
+  console.log(`💰 Budget endpoint: http://localhost:${PORT}/api/budget`);
   console.log(
-    `🌸 Shared balance endpoint: http://localhost:${PORT}/api/shared-balance`
-  );
-  console.log(
-    `🎨 POLLINATIONS_API_KEY: ${
-      process.env.POLLINATIONS_API_KEY
-        ? `${process.env.POLLINATIONS_API_KEY.slice(0, 8)}...`
-        : "NOT SET"
+    `🔑 AI_GATEWAY_API_KEY: ${
+      process.env.AI_GATEWAY_API_KEY
+        ? `${process.env.AI_GATEWAY_API_KEY.slice(0, 8)}...`
+        : process.env.VERCEL_OIDC_TOKEN
+          ? "OIDC token present"
+          : "NOT SET"
     }`
   );
 });

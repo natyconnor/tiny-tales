@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { generateImage } from "ai";
 import { parseImageProxyToken } from "./imageProxyToken.js";
 
 interface VercelRequest extends IncomingMessage {
@@ -12,25 +13,11 @@ interface VercelResponse extends ServerResponse {
   json: (body: unknown) => void;
 }
 
-type PollinationsErrorBody = {
-  status?: number;
-  success?: boolean;
-  error?: {
-    code?: string;
-    message?: string;
-  };
-};
-
-function parsePollinationsError(text: string): PollinationsErrorBody | null {
-  try {
-    const parsed = JSON.parse(text) as PollinationsErrorBody;
-    if (parsed && typeof parsed === "object" && parsed.error) {
-      return parsed;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+function hasGatewayAuth(): boolean {
+  return Boolean(
+    process.env.AI_GATEWAY_API_KEY?.trim() ||
+      process.env.VERCEL_OIDC_TOKEN?.trim()
+  );
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -39,6 +26,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (!hasGatewayAuth()) {
+      return res.status(503).json({
+        error:
+          "Image generation requires AI Gateway. Set AI_GATEWAY_API_KEY or use vercel env pull.",
+        code: "GATEWAY_NOT_CONFIGURED",
+      });
+    }
+
     const token = getQueryParam(req.query.token);
     if (!token) {
       return res.status(400).json({ error: "Missing required token parameter" });
@@ -49,95 +44,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: "Invalid image token" });
     }
 
-    const configuredPollinationsKey = process.env.POLLINATIONS_API_KEY?.trim();
-    const upstreamPollinationsKey =
-      payload.pollinationsApiKey ?? configuredPollinationsKey;
-    if (!upstreamPollinationsKey) {
-      return res.status(503).json({
-        error:
-          "Image generation requires a Pollinations API key. Configure POLLINATIONS_API_KEY or connect Pollinations before generating images.",
-      });
-    }
-
-    const upstreamResponse = await fetch(
-      "https://gen.pollinations.ai/v1/images/generations",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${upstreamPollinationsKey}`,
-        },
-        body: JSON.stringify({
-          model: payload.model,
-          prompt: payload.prompt,
-          size: "512x512",
-          response_format: "url",
-        }),
-      }
-    );
-
-    if (!upstreamResponse.ok) {
-      const errorText = (await upstreamResponse.text()).slice(0, 500);
-      const parsed = parsePollinationsError(errorText);
-      const upstreamMessage = parsed?.error?.message;
-
-      if (upstreamResponse.status === 402) {
-        return res.status(402).json({
-          error: upstreamMessage ?? "Insufficient pollen balance. Top up at enter.pollinations.ai.",
-          code: "PAYMENT_REQUIRED",
-        });
-      }
-
-      return res.status(upstreamResponse.status).json({
-        error: upstreamMessage ?? `Image generation failed (${upstreamResponse.status}).`,
-        code: parsed?.error?.code ?? "UPSTREAM_ERROR",
-        detail: errorText,
-      });
-    }
-
-    const result = (await upstreamResponse.json()) as {
-      data?: Array<{ url?: string; b64_json?: string }>;
-    };
-
-    const imageUrl = result.data?.[0]?.url;
-    const b64 = result.data?.[0]?.b64_json;
-
-    if (!imageUrl && b64) {
-      const imageBuffer = Buffer.from(b64, "base64");
-      res.setHeader("Content-Type", "image/png");
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      res.setHeader("Content-Length", imageBuffer.byteLength.toString());
-      res.end(imageBuffer);
-      return;
-    }
-
-    if (!imageUrl) {
-      return res.status(502).json({
-        error: "Image generation succeeded but returned no image URL.",
-        code: "NO_IMAGE_URL",
-      });
-    }
-
-    const imageResponse = await fetch(imageUrl, {
-      headers: { Authorization: `Bearer ${upstreamPollinationsKey}` },
+    const result = await generateImage({
+      model: payload.model,
+      prompt: payload.prompt,
+      aspectRatio: "1:1",
     });
-    if (!imageResponse.ok) {
+
+    const image = result.images[0];
+    if (!image) {
       return res.status(502).json({
-        error: `Failed to download generated image (${imageResponse.status}).`,
-        code: "IMAGE_DOWNLOAD_FAILED",
+        error: "Image generation succeeded but returned no image.",
+        code: "NO_IMAGE",
       });
     }
 
-    const contentType = imageResponse.headers.get("content-type") ?? "image/jpeg";
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const mediaType =
+      "mediaType" in image && typeof image.mediaType === "string"
+        ? image.mediaType
+        : "image/png";
 
-    res.setHeader("Content-Type", contentType);
+    let imageBuffer: Buffer;
+    if ("uint8Array" in image && image.uint8Array) {
+      imageBuffer = Buffer.from(image.uint8Array);
+    } else if ("base64" in image && typeof image.base64 === "string") {
+      imageBuffer = Buffer.from(image.base64, "base64");
+    } else {
+      return res.status(502).json({
+        error: "Image generation returned an unsupported image format.",
+        code: "UNSUPPORTED_IMAGE",
+      });
+    }
+
+    res.setHeader("Content-Type", mediaType);
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Content-Length", imageBuffer.byteLength.toString());
     res.end(imageBuffer);
   } catch (error) {
     console.error("Image proxy error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
+    const lower = message.toLowerCase();
+
+    if (
+      lower.includes("credit") ||
+      lower.includes("payment") ||
+      lower.includes("402") ||
+      lower.includes("insufficient")
+    ) {
+      return res.status(402).json({
+        error:
+          "AI credits are exhausted. Top up AI Gateway credits in your Vercel dashboard.",
+        code: "PAYMENT_REQUIRED",
+      });
+    }
+
     return res.status(500).json({ error: `Image proxy failed: ${message}` });
   }
 }

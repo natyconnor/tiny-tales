@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "ai": "^7.0.107",
     "convex": "^1.21.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.468.0",

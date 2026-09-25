@@ -13,6 +13,7 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 - **📚 Story History**: Automatically saves recent stories to localStorage
 - **✨ Word Highlighting**: Hover over words for interactive reading practice
 - **🔗 Share Stories**: Share your favorite tales with others without needing a login
+- **🎁 Free budget**: Uses your Vercel AI Gateway monthly credit and shows remaining $ plus an estimate per story
 
 ## 🚀 Getting Started
 
@@ -20,6 +21,7 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 
 - Node.js 18+
 - [pnpm](https://pnpm.io/) (or npm/yarn)
+- A [Vercel](https://vercel.com) account (for AI Gateway free credits)
 
 ### Quick Start
 
@@ -30,26 +32,30 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
    pnpm install
    ```
 
-2. **Set up Convex** (required for the app)
+2. **Set up Convex** (required for shared story links)
    ```bash
    npx convex dev
    ```
    This creates a Convex project, deploys the schema, and adds `VITE_CONVEX_URL` to `.env.local`. Keep this running in one terminal.
 
-3. **Add Pollinations auth** (required for generation)
+3. **Add AI Gateway auth** (required for generation)
 
    Edit `.env.local` and add:
    ```env
-   # Shared/server Pollinations API key for text + image generation
-   POLLINATIONS_API_KEY=your_pollinations_api_key_here
-   # Strongly recommended in dev, required in production for stable signed /api/image tokens
+   # Preferred for local/CI: create a key in the Vercel dashboard → AI Gateway
+   AI_GATEWAY_API_KEY=your_ai_gateway_api_key_here
+
+   # Strongly recommended; required in production for stable signed /api/image tokens
    IMAGE_PROXY_SIGNING_SECRET=your_random_long_secret_here
    ```
-   Tiny Tales needs a Pollinations API key for story + image generation. You have two ways to provide one:
-   - Set `POLLINATIONS_API_KEY` to enable shared/server-side generation.
-   - Or leave `POLLINATIONS_API_KEY` unset and connect a personal Pollinations key in the app before generating.
 
-   Get a key at [Pollinations](https://enter.pollinations.ai/).
+   Or link the project and pull OIDC credentials:
+   ```bash
+   vercel link
+   vercel env pull .env.local
+   ```
+
+   Every Vercel team gets **$5/month** of AI Gateway credit with no monthly commitment. See [AI Gateway pricing](https://vercel.com/docs/ai-gateway/pricing).
 
 4. **Start the app** (in a second terminal)
    ```bash
@@ -62,13 +68,7 @@ A magical reading exercise generator for kids! Create simple, engaging stories w
 - **Terminals**: You need `npx convex dev` (Convex backend) and `pnpm dev:all` (frontend + API) running
 - **Alternative**: Run `pnpm dev:api` and `pnpm dev` separately if you prefer
 - **API port**: Override with `API_PORT` env variable
-- **Generation auth**:
-  - With `POLLINATIONS_API_KEY` set, the app can generate with shared/server credits.
-  - Without it, users must connect their own Pollinations key in the UI before generating stories or images.
-- **Shared balance toggle**:
-  - Open with `?showSharedBalance=true` to show shared pollen balance and persist it in a cookie
-  - Open with `?showSharedBalance=false` to hide it again
-
+- **Budget**: The UI shows remaining AI Gateway credit and an estimate for the selected story + image models. Generation stops only when credits are exhausted.
 
 ## 🌐 Deployment
 
@@ -77,9 +77,9 @@ Deploy to **Vercel** (configured via `vercel.json`):
 1. Push to GitHub and import the project in [Vercel](https://vercel.com)
 2. Add environment variables:
    - `VITE_CONVEX_URL` — from your Convex dashboard (deploy with `npx convex deploy`)
-   - `POLLINATIONS_API_KEY` — optional only if every user will connect their own Pollinations key; required for shared generation and shared balance
-   - `IMAGE_PROXY_SIGNING_SECRET` — required secret used to sign and encrypt internal image proxy tokens
-3. Deploy; Vercel builds the frontend and runs the API serverless function
+   - `AI_GATEWAY_API_KEY` — optional on Vercel if OIDC is enabled for the project; recommended for clarity
+   - `IMAGE_PROXY_SIGNING_SECRET` — required secret used to sign internal image proxy tokens
+3. Deploy; Vercel builds the frontend and runs the API serverless functions
 
 Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.
 
@@ -87,7 +87,7 @@ Shared story links (`/s/:id`) are handled by the SPA rewrite in `vercel.json`.
 
 - **Frontend**: React 18, TypeScript, Vite
 - **Styling**: Tailwind CSS
-- **AI**: Pollinations API (text + images)
+- **AI**: Vercel AI Gateway (text + images via AI SDK)
 - **Backend**: Convex (story sharing)
 - **Deployment**: Vercel
 - **Storage**: Convex
@@ -100,7 +100,10 @@ tiny-tales/
 │   ├── generate.ts      # Story generation endpoint
 │   ├── image.ts         # Server-side image proxy endpoint
 │   ├── imageProxyToken.ts # HMAC signing helpers for proxy URLs
-│   └── sharedBalance.ts # Shared Pollinations balance endpoint
+│   ├── modelCatalog.ts  # Curated AI Gateway models
+│   ├── models.ts        # Model list endpoint
+│   ├── budget.ts        # Remaining credits + story cost estimate
+│   └── storyBudget.ts   # Shared credit/estimate helpers
 ├── convex/
 │   ├── schema.ts        # Shared stories schema
 │   └── stories.ts       # Share & fetch mutations/queries
@@ -117,12 +120,12 @@ tiny-tales/
 
 1. **Enter a topic** — What should the story be about?
 2. **Set word length** — Slider for max letters per word (3–8)
-3. **Generate** — AI creates a story and 4 illustrations
+3. **Generate** — AI creates a story and 4 illustrations (uses remaining AI Gateway credit)
 4. **Read & share** — Hover words, print, or share via link
 
 ## 🙏 Attribution
 
-Tiny Tales uses [pollinations.ai](https://pollinations.ai/) for text and image generation.
+Tiny Tales uses [Vercel AI Gateway](https://vercel.com/ai-gateway) for text and image generation.
 
 
 Made with ❤️ for little readers everywhere

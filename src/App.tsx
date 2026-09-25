@@ -33,7 +33,8 @@ import { renderExportCanvas } from "./utils/exportCanvas";
 import { splitStoryIntoSegments } from "./utils/storySegments";
 import { renderBookletDataUrl } from "./utils/bookletCanvas";
 import { useDebugLog } from "./hooks/useDebugLog";
-import { usePollinations } from "./hooks/usePollinations";
+import { useBudget } from "./hooks/useBudget";
+import { useModels } from "./hooks/useModels";
 import { IMAGE_SAFETY_HINT, useStoryImages } from "./hooks/useStoryImages";
 import { useStoryHistory } from "./hooks/useStoryHistory";
 import { loadSettings, type UserSettings } from "./utils/settingsStorage";
@@ -143,26 +144,21 @@ function App() {
     onMarkStorySafetyBlocked: markSavedStorySafetyBlocked,
   });
 
+  const { textModels, imageModels } = useModels({
+    model,
+    imageModel,
+    setModel,
+    setImageModel,
+  });
+
   const {
-    dropdownTextModels,
-    dropdownImageModels,
-    lockedImageModelIds,
-    premiumShowcaseModels,
-    pollinationsKeyStatus,
-    pollinationsKeyError,
-    pollinationsBalanceText,
-    pollinationsUsageLoading,
-    pollinationsEstimateSummary,
-    pollinationsEstimateDetail,
-    pollinationsUsageError,
-    sharedBalanceEnabled,
-    sharedBalanceText,
-    sharedBalanceLoading,
-    sharedBalanceError,
-    usablePollinationsApiKey,
-    refreshPollinationsUsage,
-    connectPollinations,
-  } = usePollinations({ model, imageModel, setModel, setImageModel });
+    remainingUsd,
+    storyUsd,
+    approxStories,
+    loading: budgetLoading,
+    error: budgetError,
+    refresh: refreshBudget,
+  } = useBudget(model, imageModel);
 
   const debugLog = useDebugLog();
 
@@ -270,8 +266,15 @@ function App() {
     const capturedCount = imageDataUrls.filter(Boolean).length;
     if (capturedCount < imageUrls.length) return;
 
+    refreshBudget();
     triggerPostStoryOnboarding();
-  }, [story, imageUrls.length, imageDataUrls, triggerPostStoryOnboarding]);
+  }, [
+    story,
+    imageUrls.length,
+    imageDataUrls,
+    refreshBudget,
+    triggerPostStoryOnboarding,
+  ]);
 
   useEffect(() => {
     if (isLoading || !story) return;
@@ -386,7 +389,6 @@ function App() {
         maxLetters,
         model,
         imageModel,
-        pollinationsApiKey: usablePollinationsApiKey,
       };
       const fetchStart = Date.now();
 
@@ -395,6 +397,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         signal: controller.signal,
         body: JSON.stringify(requestBody),
       });
@@ -404,9 +407,19 @@ function App() {
 
         let userMessage = errorData.error || "Something went wrong";
         if (errorData.code === "PAYMENT_REQUIRED") {
-          userMessage = "Out of pollen! Top up your balance at enter.pollinations.ai to continue generating stories.";
+          userMessage =
+            "AI credits are exhausted for now. Try again later, or add AI Gateway credits in Vercel.";
+          refreshBudget();
+        } else if (errorData.code === "MODEL_UNAVAILABLE") {
+          userMessage =
+            errorData.error ||
+            "That story model is not available on the free tier right now. Try Gemini Flash Lite.";
+        } else if (errorData.code === "GATEWAY_NOT_CONFIGURED") {
+          userMessage =
+            "AI Gateway is not configured yet. Add AI_GATEWAY_API_KEY to your environment.";
         } else if (errorData.code === "UNAUTHORIZED") {
-          userMessage = "Your Pollinations API key is invalid or expired. Please reconnect your account.";
+          userMessage =
+            "AI Gateway authentication failed. Check your AI_GATEWAY_API_KEY.";
         }
 
         if (IS_DEV) {
@@ -447,10 +460,12 @@ function App() {
       console.log("Image URLs:", data.imageUrls);
       console.log("Debug info:", data.debug);
       console.log(
-        "POLLINATIONS_API_KEY configured:",
-        data.debug?.pollinationsKeyConfigured ? "YES" : "NO"
+        "AI Gateway configured:",
+        data.debug?.gatewayConfigured ? "YES" : "NO"
       );
       console.log("==============================");
+
+      refreshBudget();
 
       const storyTitle = data.title || trimmedTopic;
       const urls = data.imageUrls || [];
@@ -474,8 +489,6 @@ function App() {
         imageUrls: urls,
         createdAt: Date.now(),
       });
-
-      refreshPollinationsUsage();
     } catch (generationError) {
       if (requestId !== generationRequestIdRef.current) return;
 
@@ -616,33 +629,22 @@ function App() {
             maxLetters={maxLetters}
             model={model}
             imageModel={imageModel}
-            availableModels={dropdownTextModels}
-            availableImageModels={dropdownImageModels}
+            availableModels={textModels}
+            availableImageModels={imageModels}
             isLoading={isLoading}
             savedStoriesCount={savedStories.length}
             inputRef={inputRef}
-            pollinationsStatus={pollinationsKeyStatus}
-            pollinationsError={
-              pollinationsKeyStatus === "invalid" ? pollinationsKeyError : ""
-            }
-            pollinationsBalanceText={pollinationsBalanceText}
-            pollinationsEstimateLoading={pollinationsUsageLoading}
-            pollinationsEstimateSummary={pollinationsEstimateSummary}
-            pollinationsEstimateDetail={pollinationsEstimateDetail}
-            pollinationsEstimateError={pollinationsUsageError}
-            sharedBalanceEnabled={sharedBalanceEnabled}
-            sharedBalanceText={sharedBalanceText}
-            sharedBalanceLoading={sharedBalanceLoading}
-            sharedBalanceError={sharedBalanceError}
-            lockedImageModelIds={lockedImageModelIds}
-            premiumShowcaseModels={premiumShowcaseModels}
+            budgetLoading={budgetLoading}
+            remainingUsd={remainingUsd}
+            storyEstimateUsd={storyUsd}
+            approxStories={approxStories}
+            budgetError={budgetError}
             onTopicChange={setTopic}
             onMaxLettersChange={setMaxLetters}
             onModelChange={setModel}
             onImageModelChange={setImageModel}
             onGenerate={generateStory}
             onToggleHistory={() => setShowHistory((prev) => !prev)}
-            onConnectPollinations={connectPollinations}
           />
 
           <AnimatePresence mode="wait">
@@ -860,13 +862,13 @@ function App() {
             </a>
             <span className="text-gray-300">·</span>
             <a
-              href="https://pollinations.ai"
+              href="https://vercel.com/ai-gateway"
               target="_blank"
               rel="noopener noreferrer"
               className="text-gray-400 hover:text-pink-500 transition-colors underline underline-offset-2"
-              aria-label="Visit pollinations.ai"
+              aria-label="Visit Vercel AI Gateway"
             >
-              Powered by pollinations.ai
+              Powered by Vercel AI Gateway
             </a>
           </p>
         </motion.footer>

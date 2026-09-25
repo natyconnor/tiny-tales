@@ -1,13 +1,13 @@
 import { type RefObject, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { History, Sparkles, Wand2, Lightbulb, Info } from "lucide-react";
+import { History, Sparkles, Wand2, Lightbulb } from "lucide-react";
 
 import {
   LETTER_LABELS,
   type ModelOption,
   PROMPT_IDEAS,
 } from "../constants/story";
-import Tooltip from "./Tooltip";
+import { formatApproxStories, formatUsd } from "../hooks/useBudget";
 
 type StoryFormProps = {
   topic: string;
@@ -19,30 +19,17 @@ type StoryFormProps = {
   isLoading: boolean;
   savedStoriesCount: number;
   inputRef: RefObject<HTMLTextAreaElement>;
-  pollinationsStatus: "disconnected" | "validating" | "valid" | "invalid";
-  pollinationsError: string;
-  pollinationsBalanceText: string;
-  pollinationsEstimateLoading: boolean;
-  pollinationsEstimateSummary: string;
-  pollinationsEstimateDetail: string;
-  pollinationsEstimateError: string;
-  sharedBalanceEnabled: boolean;
-  sharedBalanceText: string;
-  sharedBalanceLoading: boolean;
-  sharedBalanceError: string;
-  lockedImageModelIds: string[];
-  premiumShowcaseModels: Array<{
-    id: string;
-    name: string;
-    blurb: string;
-  }>;
+  budgetLoading: boolean;
+  remainingUsd: number | null;
+  storyEstimateUsd: number | null;
+  approxStories: number | null;
+  budgetError: string;
   onTopicChange: (value: string) => void;
   onMaxLettersChange: (value: number) => void;
   onModelChange: (value: string) => void;
   onImageModelChange: (value: string) => void;
   onGenerate: () => void;
   onToggleHistory: () => void;
-  onConnectPollinations: () => void;
 };
 
 export default function StoryForm({
@@ -55,42 +42,23 @@ export default function StoryForm({
   isLoading,
   savedStoriesCount,
   inputRef,
-  pollinationsStatus,
-  pollinationsError,
-  pollinationsBalanceText,
-  pollinationsEstimateLoading,
-  pollinationsEstimateSummary,
-  pollinationsEstimateDetail,
-  pollinationsEstimateError,
-  sharedBalanceEnabled,
-  sharedBalanceText,
-  sharedBalanceLoading,
-  sharedBalanceError,
-  lockedImageModelIds,
-  premiumShowcaseModels,
+  budgetLoading,
+  remainingUsd,
+  storyEstimateUsd,
+  approxStories,
+  budgetError,
   onTopicChange,
   onMaxLettersChange,
   onModelChange,
   onImageModelChange,
   onGenerate,
   onToggleHistory,
-  onConnectPollinations,
 }: StoryFormProps) {
   const [showHints, setShowHints] = useState(false);
   const [hintTimeout, setHintTimeout] = useState<ReturnType<
     typeof setTimeout
   > | null>(null);
-  const [showPremiumPopup, setShowPremiumPopup] = useState(false);
-  const [premiumPromptContext, setPremiumPromptContext] = useState<
-    "story" | "image"
-  >("story");
   const promptData = PROMPT_IDEAS[maxLetters] || PROMPT_IDEAS[5];
-
-  useEffect(() => {
-    if (pollinationsStatus === "valid") {
-      setShowPremiumPopup(false);
-    }
-  }, [pollinationsStatus]);
 
   useEffect(() => {
     const textarea = inputRef.current;
@@ -100,7 +68,6 @@ export default function StoryForm({
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, [inputRef, topic]);
 
-  // Delayed close to allow mouse to move from button to popover
   const handleMouseLeave = () => {
     const timeout = setTimeout(() => setShowHints(false), 150);
     setHintTimeout(timeout);
@@ -114,19 +81,6 @@ export default function StoryForm({
     setShowHints(true);
   };
 
-  const onStoryModelSelect = (value: string) => {
-    onModelChange(value);
-  };
-
-  const onImageModelSelect = (value: string) => {
-    if (lockedImageModelIds.includes(value)) {
-      setPremiumPromptContext("image");
-      setShowPremiumPopup(true);
-      return;
-    }
-    onImageModelChange(value);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -134,7 +88,6 @@ export default function StoryForm({
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 md:p-8 border-4 border-dashed border-pink-200 no-print"
     >
-      {/* Topic Input */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -146,7 +99,6 @@ export default function StoryForm({
           <label className="block text-lg font-bold text-gray-700 font-comic">
             🌟 What should the story be about?
           </label>
-          {/* Hint Icon */}
           <div className="relative">
             <button
               type="button"
@@ -160,7 +112,6 @@ export default function StoryForm({
               <Lightbulb className="w-4 h-4" />
             </button>
 
-            {/* Hints Popover */}
             <AnimatePresence>
               {showHints && (
                 <motion.div
@@ -180,24 +131,21 @@ export default function StoryForm({
                       </span>
                     </div>
                     <ul className="space-y-2">
-                      {promptData.ideas.map((idea, index) => (
-                        <li key={index}>
+                      {promptData.ideas.map((idea) => (
+                        <li key={idea}>
                           <button
                             type="button"
                             onClick={() => {
                               onTopicChange(idea);
                               setShowHints(false);
                             }}
-                            className="w-full text-left px-3 py-2 text-sm text-gray-700 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors"
+                            className="w-full text-left text-sm text-gray-700 hover:text-pink-600 hover:bg-pink-50 rounded-lg px-2 py-1.5 transition-colors"
                           >
                             {idea}
                           </button>
                         </li>
                       ))}
                     </ul>
-                    <p className="text-xs text-gray-400 mt-3 text-center">
-                      Click an idea or type your own!
-                    </p>
                   </div>
                 </motion.div>
               )}
@@ -206,22 +154,15 @@ export default function StoryForm({
         </div>
         <textarea
           ref={inputRef}
-          rows={1}
           value={topic}
           onChange={(event) => onTopicChange(event.target.value)}
-          placeholder="A shy cat who learns to be brave..."
-          className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend placeholder:text-gray-400 shadow-sm resize-none overflow-hidden"
+          placeholder="A brave little mouse who loves cheese adventures..."
           disabled={isLoading}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              onGenerate();
-            }
-          }}
+          rows={1}
+          className="w-full px-4 py-3 text-lg rounded-2xl border-2 border-gray-300 focus:border-pink-400 focus:ring-4 focus:ring-pink-100 outline-none transition-all font-lexend resize-none overflow-hidden shadow-sm"
         />
       </motion.div>
 
-      {/* Max Letters Slider */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -277,7 +218,6 @@ export default function StoryForm({
         </div>
       </motion.div>
 
-      {/* Model Selector */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -290,7 +230,7 @@ export default function StoryForm({
         </label>
         <select
           value={model}
-          onChange={(event) => onStoryModelSelect(event.target.value)}
+          onChange={(event) => onModelChange(event.target.value)}
           disabled={isLoading}
           className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
@@ -302,12 +242,11 @@ export default function StoryForm({
         </select>
       </motion.div>
 
-      {/* Image Model Selector */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.4, duration: 0.4 }}
-        className="mb-8"
+        className="mb-6"
         data-tutorial="image-ai"
       >
         <label className="block text-lg font-bold text-gray-700 mb-2 font-comic">
@@ -315,163 +254,55 @@ export default function StoryForm({
         </label>
         <select
           value={imageModel}
-          onChange={(event) => onImageModelSelect(event.target.value)}
+          onChange={(event) => onImageModelChange(event.target.value)}
           disabled={isLoading}
           className="w-full px-4 py-3 text-base rounded-2xl border-2 border-gray-300 bg-white focus:border-fuchsia-500 focus:ring-4 focus:ring-fuchsia-100 outline-none transition-all font-lexend cursor-pointer shadow-sm"
         >
           {availableImageModels.map((item) => (
             <option key={item.id} value={item.id}>
-              {lockedImageModelIds.includes(item.id) ? "🔒 " : ""}
               {item.name} — {item.description}
             </option>
           ))}
         </select>
       </motion.div>
 
-      {pollinationsStatus !== "valid" && (
-        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-sm text-sky-900 font-lexend">
-            <span className="font-semibold">Using shared AI credits</span>
-            <Tooltip text="Using Tiny Tales shared credits. Click to connect Pollinations and use your own balance + paid models.">
-              <button
-                type="button"
-                onClick={onConnectPollinations}
-                disabled={isLoading || pollinationsStatus === "validating"}
-                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 text-sky-700 hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Shared credits info"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
-            </Tooltip>
-          </div>
-          {sharedBalanceEnabled &&
-            (sharedBalanceLoading ? (
-              <p className="mt-1 text-sm text-sky-800 font-lexend">
-                Checking shared pollen balance...
-              </p>
-            ) : sharedBalanceText ? (
-              <p className="mt-1 text-sm text-sky-800 font-lexend">
-                🌸 Shared pollen balance: {sharedBalanceText}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-sky-700 font-lexend">
-                Shared balance currently unavailable.
-              </p>
-            ))}
-          {sharedBalanceEnabled && sharedBalanceError && (
-            <p className="mt-1 text-xs text-amber-700 font-lexend">
-              {sharedBalanceError}
-            </p>
-          )}
-        </div>
-      )}
-
-      {pollinationsStatus === "valid" && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm"
-        >
-          <p className="text-sm font-semibold text-emerald-900 font-lexend">
-            🌸 Pollinations balance: {pollinationsBalanceText || "Unavailable"}
+      <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+        {budgetLoading ? (
+          <p className="text-sm text-sky-800 font-lexend">
+            Checking remaining free budget...
           </p>
-          {pollinationsEstimateLoading ? (
-            <p className="mt-1 text-sm text-emerald-800 font-lexend">
-              Estimating stories left from your latest usage...
+        ) : (
+          <>
+            <p className="text-sm text-sky-900 font-lexend">
+              Free budget left:{" "}
+              <span className="font-semibold">
+                {remainingUsd === null ? "Unavailable" : formatUsd(remainingUsd)}
+              </span>
             </p>
-          ) : pollinationsEstimateSummary ? (
-            <>
-              <p className="mt-1 text-sm text-emerald-800 font-lexend">
-                {pollinationsEstimateSummary}
-              </p>
-              <p className="mt-1 text-xs text-emerald-700 font-lexend">
-                {pollinationsEstimateDetail}
-              </p>
-            </>
-          ) : (
-            <p className="mt-1 text-sm text-emerald-800 font-lexend">
-              Generate a few stories with this key to build a model-specific
-              estimate.
-            </p>
-          )}
-          {pollinationsEstimateError && (
-            <p className="mt-2 text-xs text-amber-700 font-lexend">
-              {pollinationsEstimateError}
-            </p>
-          )}
-          {pollinationsEstimateError && (
-            <button
-              type="button"
-              onClick={onConnectPollinations}
-              className="mt-3 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold font-lexend transition-colors"
-            >
-              Reconnect Pollinations
-            </button>
-          )}
-        </motion.div>
-      )}
-
-      <AnimatePresence>
-        {showPremiumPopup && (
-          <motion.div
-            key="premium-unlock-popup"
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm"
-          >
-            <p className="text-sm font-semibold text-amber-900 font-lexend">
-              That {premiumPromptContext === "story" ? "story" : "image"} model
-              is a paid model.
-            </p>
-            <p className="mt-1 text-sm text-amber-800 font-lexend">
-              Connect Pollinations to use higher-quality paid models:
-            </p>
-            <p className="mt-2 text-xs text-amber-700 font-lexend">
-              Charges come from the user's own Pollinations balance. Tiny Tales
-              does not receive these payments.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {premiumShowcaseModels.map((item) => (
-                <span
-                  key={item.id}
-                  className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 font-lexend"
-                >
-                  {item.name} · {item.blurb}
-                </span>
-              ))}
-            </div>
-            {pollinationsStatus === "invalid" && pollinationsError && (
-              <p className="mt-3 text-xs text-red-600 font-lexend">
-                {pollinationsError}
+            {storyEstimateUsd !== null && (
+              <p className="mt-1 text-sm text-sky-800 font-lexend">
+                This story ≈{" "}
+                <span className="font-semibold">
+                  {formatUsd(storyEstimateUsd)}
+                </span>{" "}
+                with the selected models (mostly 4 pictures)
               </p>
             )}
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onConnectPollinations}
-                disabled={isLoading || pollinationsStatus === "validating"}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold font-lexend transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {pollinationsStatus === "validating"
-                  ? "Checking key..."
-                  : "Connect Pollinations"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowPremiumPopup(false)}
-                className="px-3 py-2 rounded-xl bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 font-medium font-lexend transition-colors"
-              >
-                Not now
-              </button>
-            </div>
-          </motion.div>
+            {approxStories !== null && remainingUsd !== null && remainingUsd > 0 && (
+              <p className="mt-1 text-xs text-sky-700 font-lexend">
+                About {formatApproxStories(approxStories)} stories left at this
+                quality
+              </p>
+            )}
+            {budgetError && (
+              <p className="mt-1 text-xs text-amber-700 font-lexend">
+                {budgetError}
+              </p>
+            )}
+          </>
         )}
-      </AnimatePresence>
+      </div>
 
-      {/* Generate Button */}
       <motion.button
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -522,7 +353,6 @@ export default function StoryForm({
         )}
       </motion.button>
 
-      {/* History Button */}
       {savedStoriesCount > 0 && (
         <motion.button
           initial={{ opacity: 0 }}

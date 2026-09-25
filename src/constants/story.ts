@@ -6,45 +6,38 @@ export type ModelOption = {
   id: string;
   name: string;
   description: string;
-  paidOnly?: boolean;
 };
 
 // Dynamic models are loaded from /api/models at runtime.
-// These are safe fallbacks if API discovery fails.
+// These are safe fallbacks if the API is unavailable.
 export const DEFAULT_AVAILABLE_MODELS: ModelOption[] = [
   {
-    id: "gemini-fast",
+    id: "google/gemini-2.5-flash-lite",
     name: "Gemini 2.5 Flash Lite",
     description: "Fastest and cheapest",
   },
   {
-    id: "openai",
-    name: "GPT-5 Mini",
-    description: "Balanced quality and speed",
+    id: "alibaba/qwen3.7-flash",
+    name: "Qwen 3.7 Flash",
+    description: "Stronger writing, still cheap",
   },
   {
-    id: "openai-large",
-    name: "GPT-5.2",
-    description: "Highest quality writing",
-    paidOnly: true,
+    id: "xiaomi/mimo-v2.6-flash",
+    name: "MiMo 2.6 Flash",
+    description: "Newest free-tier flash model",
   },
 ];
 
 export const DEFAULT_IMAGE_MODELS: ModelOption[] = [
   {
-    id: "grok-imagine",
-    name: "Grok Imagine",
-    description: "Best value image quality",
+    id: "bytedance/seedream-5.0-lite",
+    name: "Seedream 5.0 Lite",
+    description: "Stronger illustration quality",
   },
   {
-    id: "klein",
-    name: "FLUX.2 Klein 4B",
-    description: "Balanced quality and price",
-  },
-  {
-    id: "qwen-image",
-    name: "Qwen Image Plus",
-    description: "Alternative high-quality style",
+    id: "bfl/flux-kontext-pro",
+    name: "FLUX Kontext Pro",
+    description: "Stronger prompt following",
   },
 ];
 

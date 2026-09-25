@@ -284,7 +284,8 @@ export function useStoryImages({
         if (blockedBySafety) {
           failureMessage = toSafetyBlockedMessage(failureDetail);
         } else if (errorCode === "PAYMENT_REQUIRED") {
-          failureMessage = "Out of pollen! Top up your balance at enter.pollinations.ai to continue generating images.";
+          failureMessage =
+            "AI credits are exhausted. Top up AI Gateway credits in your Vercel dashboard to continue generating images.";
         } else if (response.status >= 500) {
           failureMessage = "Image service had an error. You can retry this image.";
         } else {
